@@ -1,0 +1,40 @@
+all:
+  children:
+    vpn:
+      hosts:
+        gw:
+          ansible_host: gw.myapp.example.com
+          ansible_user: ubuntu
+
+    gitlab_server:
+      hosts:
+        gitlab:
+          ansible_host: gitlab.myapp.example.com
+          ansible_user: ubuntu
+
+    mailcow:
+      hosts:
+        mailcow:
+          ansible_host: mail.cards.myapp.example.com  # or use public IP from terraform output
+          ansible_user: ubuntu
+
+    gitlab_runners:
+      hosts:
+        stage-runner:
+          ansible_host: 10.10.2.10
+          ansible_user: ubuntu
+        prod-runner:
+          ansible_host: 10.30.2.10
+          ansible_user: ubuntu
+
+    # ── K8s Apps (Helm/kubectl via local kubeconfig) ──────────────────────────
+    # Uses localhost — Ansible connects locally and runs helm/kubectl commands
+    # against the active kubeconfig context.
+    # Switch context before running:
+    #   make kubeconfig ENV=stage  (sets context to stage cluster)
+    #   make kubeconfig ENV=prod   (sets context to prod cluster)
+    k8s_apps:
+      hosts:
+        localhost:
+          ansible_connection: local
+          ansible_python_interpreter: "{{ ansible_playbook_python }}"

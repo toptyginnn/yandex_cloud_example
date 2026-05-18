@@ -1,0 +1,41 @@
+---
+# ── Mailcow via Docker Compose ────────────────────────────────────────────────
+
+- name: Install git (required for mailcow clone)
+  ansible.builtin.apt:
+    name: git
+    state: present
+    update_cache: true
+
+- name: Clone mailcow-dockerized repository
+  ansible.builtin.git:
+    repo: https://github.com/mailcow/mailcow-dockerized.git
+    dest: "{{ mailcow_install_dir }}"
+    version: "{{ mailcow_branch }}"
+    update: false  # do not overwrite on re-run; use mailcow's own update script
+
+
+- name: Template mailcow.conf
+  ansible.builtin.template:
+    src: mailcow.conf.j2
+    dest: "{{ mailcow_install_dir }}/mailcow.conf"
+    mode: "0600"
+  notify: Restart mailcow
+
+- name: Pull Mailcow Docker images
+  ansible.builtin.command:
+    cmd: docker compose pull
+    chdir: "{{ mailcow_install_dir }}"
+  register: mailcow_pull
+  changed_when: "'Pull complete' in mailcow_pull.stdout or 'Downloaded newer image' in mailcow_pull.stdout"
+
+- name: Start Mailcow stack
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ mailcow_install_dir }}"
+  register: mailcow_compose_up
+  changed_when: >
+    'Container' in mailcow_compose_up.stdout or
+    'Creating' in mailcow_compose_up.stdout or
+    'Starting' in mailcow_compose_up.stdout or
+    'Recreating' in mailcow_compose_up.stdout

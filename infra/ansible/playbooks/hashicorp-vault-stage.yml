@@ -1,0 +1,25 @@
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# HashiCorp Vault – Stage
+#
+# Prerequisites:
+#   1. tofu apply ENV=stage  (creates K8s cluster)
+#   2. make kubeconfig ENV=stage
+#
+# Run:
+#   ansible-playbook playbooks/hashicorp-vault-stage.yml
+#
+# После первой установки выполни init и unseal вручную:
+#   kubectl -n vault exec -it vault-0 -- vault operator init
+#   kubectl -n vault exec -it vault-0 -- vault operator unseal <KEY>  # 3 раза
+# ──────────────────────────────────────────────────────────────────────────────
+- name: Deploy HashiCorp Vault to stage
+  hosts: k8s_apps_stage
+  gather_facts: false
+
+  vars:
+    env_name: stage
+
+  roles:
+    - role: hashicorp_vault
+      tags: [hashicorp_vault, vault]

@@ -1,0 +1,8 @@
+gitlab_runner_name: stage-runner
+gitlab_runner_tags:
+  - stage
+  - docker
+gitlab_runner_token: "{{ vault_gitlab_runner_token | default('CHANGE_ME_STAGE_RUNNER_TOKEN') }}"
+
+vm_role: gitlab-runner-stage
+monitoring_ip: "10.10.2.36"

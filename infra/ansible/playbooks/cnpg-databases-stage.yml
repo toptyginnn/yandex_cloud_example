@@ -1,0 +1,21 @@
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# CNPG Databases – Stage
+#
+# Prerequisites:
+#   1. k8s-apps-stage.yml (CNPG operator + cluster must be up)
+#   2. make kubeconfig ENV=stage
+#
+# Run:
+#   ansible-playbook playbooks/cnpg-databases-stage.yml
+# ──────────────────────────────────────────────────────────────────────────────
+- name: Create databases in CNPG cluster (stage)
+  hosts: k8s_apps_stage
+  gather_facts: false
+
+  vars:
+    env_name: stage
+
+  roles:
+    - role: cnpg_databases
+      tags: [cnpg_databases, databases]

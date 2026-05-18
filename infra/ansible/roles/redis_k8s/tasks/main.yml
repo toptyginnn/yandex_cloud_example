@@ -1,0 +1,151 @@
+---
+# ── Redis via native Kubernetes deployment ────────────────────────────────────
+
+- name: Create databases namespace
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ redis_namespace }}"
+    state: present
+  become: false
+
+- name: Create Redis password secret
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ redis_name }}-password"
+        namespace: "{{ redis_namespace }}"
+      type: Opaque
+      stringData:
+        redis-password: "{{ redis_password }}"
+  become: false
+
+- name: Create Redis ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: "{{ redis_name }}-config"
+        namespace: "{{ redis_namespace }}"
+      data:
+        redis.conf: |
+          bind 0.0.0.0
+          protected-mode yes
+          port {{ redis_port }}
+          tcp-backlog 511
+          timeout 0
+          tcp-keepalive 300
+          daemonize no
+          supervised no
+          loglevel notice
+          databases 16
+          save ""
+          stop-writes-on-bgsave-error yes
+          rdbcompression yes
+          rdbchecksum yes
+          dbfilename dump.rdb
+          dir /data
+          maxmemory 200mb
+          maxmemory-policy allkeys-lru
+          appendonly no
+  become: false
+
+- name: Create Redis Deployment
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: "{{ redis_name }}"
+        namespace: "{{ redis_namespace }}"
+        labels:
+          app: "{{ redis_name }}"
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app: "{{ redis_name }}"
+        template:
+          metadata:
+            labels:
+              app: "{{ redis_name }}"
+          spec:
+            containers:
+            - name: redis
+              image: "{{ redis_image }}"
+              command:
+                - redis-server
+                - /etc/redis/redis.conf
+                - --requirepass
+                - $(REDIS_PASSWORD)
+              env:
+              - name: REDIS_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: "{{ redis_name }}-password"
+                    key: redis-password
+              ports:
+              - containerPort: "{{ redis_port }}"
+                name: redis
+                protocol: TCP
+              volumeMounts:
+              - name: config
+                mountPath: /etc/redis
+              - name: data
+                mountPath: /data
+              resources:
+                requests:
+                  cpu: "{{ redis_resources_requests_cpu }}"
+                  memory: "{{ redis_resources_requests_memory }}"
+                limits:
+                  cpu: "{{ redis_resources_limits_cpu }}"
+                  memory: "{{ redis_resources_limits_memory }}"
+              livenessProbe:
+                tcpSocket:
+                  port: "{{ redis_port }}"
+                initialDelaySeconds: 30
+                periodSeconds: 10
+              readinessProbe:
+                exec:
+                  command:
+                  - redis-cli
+                  - -a
+                  - $(REDIS_PASSWORD)
+                  - ping
+                initialDelaySeconds: 5
+                periodSeconds: 10
+            volumes:
+            - name: config
+              configMap:
+                name: "{{ redis_name }}-config"
+            - name: data
+              emptyDir: {}
+  become: false
+
+- name: Create Redis Service
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: "{{ redis_name }}"
+        namespace: "{{ redis_namespace }}"
+        labels:
+          app: "{{ redis_name }}"
+      spec:
+        type: ClusterIP
+        ports:
+        - port: "{{ redis_port }}"
+          targetPort: redis
+          protocol: TCP
+          name: redis
+        selector:
+          app: "{{ redis_name }}"
+  become: false

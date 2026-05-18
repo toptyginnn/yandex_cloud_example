@@ -1,0 +1,51 @@
+# Vaultwarden — values for a small team (<5 people)
+
+domain: "{{ vaultwarden_domain }}"
+
+adminToken:
+  value: "{{ vaultwarden_admin_token }}"
+
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: {{ vaultwarden_resources_requests_cpu }}
+    memory: {{ vaultwarden_resources_requests_memory }}
+  limits:
+    cpu: {{ vaultwarden_resources_limits_cpu }}
+    memory: {{ vaultwarden_resources_limits_memory }}
+
+# ── Persistent Storage ───────────────────────────────────────────────────────
+storage:
+  data:
+    enabled: true                    
+    name: "vaultwarden-data"          
+    size: "{{ vaultwarden_storage_size }}"
+    class: "{{ vaultwarden_storage_class }}"
+    accessMode: "ReadWriteOnce"
+    keepPvc: true                     
+
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: true
+  class: "{{ vaultwarden_ingress_class }}"
+  annotations:
+    cert-manager.io/cluster-issuer: "{{ vaultwarden_cluster_issuer }}"
+  hostname: "{{ vaultwarden_ingress_hostname }}"
+  tls: true
+  tlsSecret: vaultwarden-tls
+
+# ── Access control ────────────────────────────────────────────────────────────
+signupsAllowed: true
+invitationsAllowed: true
+showPasswordHint: false
+
+# SMTP (при необходимости)
+# smtp:
+#   host: ""
+#   port: 587
+#   from: ""
+#   username: ""
+#   password: ""

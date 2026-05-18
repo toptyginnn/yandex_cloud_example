@@ -1,0 +1,46 @@
+---
+# ── Mailcow defaults ──────────────────────────────────────────────────────────
+
+mailcow_install_dir: /opt/mailcow-data/mailcow-dockerized
+
+# Primary mail hostname (A record must point to this server)
+mailcow_hostname: "mail.cards.myapp.example.com"
+
+# Mail domains served by this server (first is primary)
+# Additional domains can be added via the web UI after deployment
+mailcow_mail_domains:
+  - cards.myapp.example.com
+
+mailcow_timezone: "Europe/Moscow"
+
+# Web UI ports
+mailcow_http_port: 80
+mailcow_https_port: 443
+
+# Mail ports (defaults match Mailcow standard)
+mailcow_smtp_port: 25
+mailcow_smtps_port: 465
+mailcow_submission_port: 587
+mailcow_imap_port: 143
+mailcow_imaps_port: 993
+mailcow_pop3s_port: 995
+mailcow_sieve_port: 4190
+
+# Let's Encrypt (Mailcow built-in ACME)
+mailcow_skip_lets_encrypt: "n"
+
+# Optional features — disable on small VMs to save RAM
+mailcow_skip_clamd: "n"     # ClamAV antivirus (requires ~1GB RAM)
+mailcow_skip_solr: "y"      # Full-text search (optional, saves ~512MB RAM)
+mailcow_skip_sogo: "n"      # SOGo webmail
+
+# DB/Redis credentials (set via ansible-vault)
+mailcow_dbpass: "{{ vault_mailcow_dbpass }}"
+mailcow_dbroot: "{{ vault_mailcow_dbroot }}"
+mailcow_redispass: "{{ vault_mailcow_redispass }}"
+
+# Watchdog notifications
+mailcow_watchdog_notify_email: ""
+
+# Mailcow git branch to track
+mailcow_branch: master

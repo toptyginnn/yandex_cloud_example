@@ -1,0 +1,108 @@
+---
+# ── Credentials secrets ───────────────────────────────────────────────────────
+
+- name: Create credentials secret for each database
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ item.secret_name }}"
+        namespace: "{{ cnpg_databases_namespace }}"
+      type: kubernetes.io/basic-auth
+      stringData:
+        username: "{{ item.owner }}"
+        password: "{{ item.password }}"
+  loop: "{{ cnpg_databases_list }}"
+  loop_control:
+    label: "{{ item.secret_name }}"
+  become: false
+
+# ── Managed roles (PostgreSQL users) ─────────────────────────────────────────
+# Build from unique owners — multiple databases can share the same owner
+# (e.g. temporal + temporal_visibility both owned by 'temporal').
+
+- name: Build unique owners list
+  ansible.builtin.set_fact:
+    _cnpg_unique_owners: >-
+      {{
+        cnpg_databases_list
+        | map(attribute='owner')
+        | unique
+        | list
+      }}
+  when: cnpg_databases_list | length > 0
+
+- name: Build managed roles list (deduplicated by owner)
+  ansible.builtin.set_fact:
+    _cnpg_managed_roles: "{{ _cnpg_managed_roles | default([]) + [_role] }}"
+  vars:
+    _db_entry: "{{ cnpg_databases_list | selectattr('owner', 'equalto', item) | first }}"
+    _role:
+      name: "{{ item }}"
+      ensure: present
+      login: true
+      passwordSecret:
+        name: "{{ _db_entry.secret_name }}"
+  loop: "{{ _cnpg_unique_owners }}"
+  loop_control:
+    label: "{{ item }}"
+  when: cnpg_databases_list | length > 0
+
+- name: Patch CNPG Cluster with managed roles
+  kubernetes.core.k8s:
+    state: patched
+    definition:
+      apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
+      metadata:
+        name: "{{ cnpg_databases_cluster_name }}"
+        namespace: "{{ cnpg_databases_namespace }}"
+      spec:
+        managed:
+          roles: "{{ _cnpg_managed_roles }}"
+  when: cnpg_databases_list | length > 0
+  become: false
+
+# ── Database CRs ──────────────────────────────────────────────────────────────
+
+# metadata.name must be RFC 1123 (no underscores) — replace _ with -
+# spec.name is the actual PostgreSQL database name — keep as-is
+- name: Create CNPG Database resources
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: postgresql.cnpg.io/v1
+      kind: Database
+      metadata:
+        name: "{{ item.name | replace('_', '-') }}"
+        namespace: "{{ cnpg_databases_namespace }}"
+      spec:
+        name: "{{ item.name }}"
+        owner: "{{ item.owner }}"
+        cluster:
+          name: "{{ cnpg_databases_cluster_name }}"
+  loop: "{{ cnpg_databases_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  become: false
+
+# ── Wait for databases to be ready ────────────────────────────────────────────
+
+- name: Wait for each database to be ready
+  kubernetes.core.k8s_info:
+    api_version: postgresql.cnpg.io/v1
+    kind: Database
+    name: "{{ item.name | replace('_', '-') }}"
+    namespace: "{{ cnpg_databases_namespace }}"
+  register: db_info
+  until: >
+    db_info.resources | length > 0 and
+    (db_info.resources[0].status.applied | default(false)) == true
+  retries: 20
+  delay: 10
+  loop: "{{ cnpg_databases_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  become: false

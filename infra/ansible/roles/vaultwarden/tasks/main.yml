@@ -1,0 +1,35 @@
+---
+# ── Vaultwarden via Helm ──────────────────────────────────────────────────────
+
+- name: Add Vaultwarden Helm repository
+  kubernetes.core.helm_repository:
+    name: guerzon
+    repo_url: https://guerzon.github.io/vaultwarden
+  become: false
+
+- name: Create Vaultwarden namespace
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ vaultwarden_namespace }}"
+    state: present
+  become: false
+
+- name: Template Vaultwarden values
+  ansible.builtin.template:
+    src: values.yaml.j2
+    dest: /tmp/vaultwarden-values.yaml
+    mode: "0600"
+  become: false
+
+- name: Install / upgrade Vaultwarden
+  kubernetes.core.helm:
+    name: "{{ vaultwarden_release_name }}"
+    chart_ref: guerzon/vaultwarden
+    chart_version: "{{ vaultwarden_chart_version }}"
+    release_namespace: "{{ vaultwarden_namespace }}"
+    create_namespace: true
+    wait: true
+    values_files:
+      - /tmp/vaultwarden-values.yaml
+  become: false

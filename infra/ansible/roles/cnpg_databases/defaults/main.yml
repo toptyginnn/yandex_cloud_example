@@ -1,0 +1,19 @@
+---
+# ── Target CNPG Cluster ───────────────────────────────────────────────────────
+cnpg_databases_cluster_name: "{{ cnpg_cluster_name | default(env_name + '-pg') }}"
+cnpg_databases_namespace: "{{ cnpg_namespace | default('databases') }}"
+
+# ── Databases to create ───────────────────────────────────────────────────────
+# Each item:
+#   name        – logical database name (also used as CRD object name)
+#   owner       – PostgreSQL role that will own the database
+#   secret_name – name of the k8s Secret holding username/password
+#   password    – plaintext password (store in vault)
+#
+# Example:
+# cnpg_databases_list:
+#   - name: temporal
+#     owner: temporal
+#     secret_name: temporal-pg-credentials
+#     password: "{{ vault_temporal_pg_password }}"
+cnpg_databases_list: []

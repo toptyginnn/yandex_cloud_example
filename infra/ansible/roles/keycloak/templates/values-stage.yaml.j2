@@ -1,0 +1,98 @@
+replicas: {{ keycloak_replica_count }}
+
+image:
+  repository: quay.io/keycloak/keycloak
+  tag: "26.5.6"
+  pullPolicy: IfNotPresent
+
+# ── Admin credentials ─────────────────────────────────────────────────────────
+command:
+  - "/opt/keycloak/bin/kc.sh"
+  - "start"
+
+extraEnv: |
+  - name: KC_BOOTSTRAP_ADMIN_USERNAME
+    value: "{{ keycloak_admin_user }}"
+  - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+    value: "{{ keycloak_admin_password }}"
+  - name: KC_DB
+    value: postgres
+  - name: KC_DB_URL
+    value: "jdbc:postgresql://{{ keycloak_pg_host }}:{{ keycloak_pg_port }}/{{ keycloak_pg_database }}"
+  - name: KC_DB_USERNAME
+    value: "{{ keycloak_pg_user }}"
+  - name: KC_DB_PASSWORD
+    value: "{{ keycloak_pg_password }}"
+  - name: KC_HOSTNAME
+    value: "{{ keycloak_ingress_hostname }}"
+  - name: KC_HOSTNAME_STRICT
+    value: "false"
+  - name: KC_HTTP_ENABLED
+    value: "true"
+  - name: KC_PROXY_HEADERS
+    value: "xforwarded"
+  - name: KC_HEALTH_ENABLED
+    value: "true"
+  - name: KC_METRICS_ENABLED
+    value: "true"
+
+# ── Probes ────────────────────────────────────────────────────────────────────
+livenessProbe: |
+  httpGet:
+    path: /health/live
+    port: 9000
+  initialDelaySeconds: 60
+  periodSeconds: 15
+  failureThreshold: 3
+
+readinessProbe: |
+  httpGet:
+    path: /health/ready
+    port: 9000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+
+startupProbe: |
+  httpGet:
+    path: /health
+    port: 9000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 30
+
+# ── Resources ─────────────────────────────────────────────────────────────────
+resources:
+  requests:
+    cpu: {{ keycloak_resources_requests_cpu }}
+    memory: {{ keycloak_resources_requests_memory }}
+  limits:
+    cpu: {{ keycloak_resources_limits_cpu }}
+    memory: {{ keycloak_resources_limits_memory }}
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
+ingress:
+  enabled: true
+  ingressClassName: "{{ keycloak_ingress_class }}"
+  annotations:
+    cert-manager.io/cluster-issuer: "{{ keycloak_cluster_issuer }}"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+    nginx.ingress.kubernetes.io/proxy-body-size: "5m"
+  rules:
+    - host: "{{ keycloak_ingress_hostname }}"
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: keycloak-tls
+      hosts:
+        - "{{ keycloak_ingress_hostname }}"
+
+service:
+  type: ClusterIP
+  httpPort: 8080
+  httpsPort: 8443
+
+# ── HTTP port (TLS terminates at ingress) ─────────────────────────────────────
+http:
+  relativePath: "/"

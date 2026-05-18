@@ -1,0 +1,7 @@
+---
+- name: Configure VPN host
+  hosts: vpn
+  become: true
+  roles:
+    - docker_host
+    - vpn

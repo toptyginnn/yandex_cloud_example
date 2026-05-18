@@ -1,0 +1,242 @@
+# kube-prometheus-stack — stage values
+# Chart: prometheus-community/kube-prometheus-stack
+
+grafana:
+  adminPassword: {{ monitoring_grafana_admin_password }}
+
+  deploymentStrategy:
+    type: Recreate
+
+  grafana.ini:
+    users:
+      allow_sign_up: false
+      auto_assign_org: true
+      auto_assign_org_role: Viewer
+    auth:
+      disable_login_form: false
+
+  ingress:
+    enabled: true
+    ingressClassName: {{ monitoring_grafana_ingress_class }}
+    hosts:
+      - {{ monitoring_grafana_ingress_hostname }}
+    tls:
+      - secretName: grafana-tls
+        hosts:
+          - {{ monitoring_grafana_ingress_hostname }}
+    annotations:
+      cert-manager.io/cluster-issuer: "{{ monitoring_grafana_cluster_issuer }}"
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  persistence:
+    enabled: true
+    size: 2Gi
+    storageClassName: yc-network-ssd
+
+  sidecar:
+    dashboards:
+      enabled: true
+    datasources:
+      enabled: true
+
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: http://loki.{{ monitoring_namespace }}.svc.cluster.local:3100
+      access: proxy
+      isDefault: false
+      jsonData:
+        maxLines: 2000
+        timeout: 60
+
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: loki-dashboards
+          orgId: 1
+          folder: Logs
+          type: file
+          disableDeletion: true
+          editable: false
+          options:
+            path: /var/lib/grafana/dashboards/loki-dashboards
+        - name: infra-dashboards
+          orgId: 1
+          folder: Infrastructure
+          type: file
+          disableDeletion: true
+          editable: false
+          options:
+            path: /var/lib/grafana/dashboards/infra-dashboards
+
+  dashboards:
+    loki-dashboards:
+      loki-quick-search:
+        gnetId: 13639
+        revision: 1
+        datasource: Loki
+      k8s-logs-namespaces:
+        gnetId: 15141
+        revision: 1
+        datasource: Loki
+      k8s-logs-pod:
+        gnetId: 15142
+        revision: 1
+        datasource: Loki
+    infra-dashboards:
+      node-exporter-full:
+        gnetId: 1860
+        revision: 37
+        datasource: Prometheus
+
+prometheus:
+  prometheusSpec:
+    retention: {{ monitoring_prometheus_retention }}
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: {{ monitoring_prometheus_memory_limit }}
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: yc-network-ssd
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: {{ monitoring_prometheus_storage_size }}
+
+    # Scrape ServiceMonitors from all namespaces
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+    additionalScrapeConfigs:
+      - job_name: vm-nodes
+        scrape_interval: 60s
+        scrape_timeout: 10s
+        static_configs:
+{% for host in groups['vm_nodes'] | default([]) %}
+          - targets:
+              - '{{ hostvars[host]["monitoring_ip"] | default(hostvars[host]["ansible_host"]) }}:9100'
+            labels:
+              hostname: '{{ host }}'
+              role: '{{ hostvars[host]["vm_role"] | default(host) }}'
+{% endfor %}
+        relabel_configs:
+          - source_labels: [__address__]
+            regex: '([^:]+):.*'
+            target_label: instance
+            replacement: '$1'
+
+alertmanager:
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['alertname', 'instance']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      receiver: telegram
+    receivers:
+    - name: telegram
+      telegram_configs:
+      - bot_token: '{{ monitoring_telegram_bot_token }}'
+        chat_id: {{ monitoring_telegram_chat_id }}
+        parse_mode: HTML
+        message: |-
+{% raw %}
+          {{ if eq .Status "firing" }}<b>🔴 FIRING ({{ .Alerts | len }})</b>{{ else }}<b>🟢 RESOLVED</b>{{ end }}
+          {{ range .Alerts }}
+          <b>{{ .Labels.alertname }}</b>{{ if .Labels.instance }} — {{ .Labels.instance }}{{ end }}
+          {{ if .Annotations.summary }}{{ .Annotations.summary }}{{ end }}
+          {{ end }}
+{% endraw %}
+
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
+
+# ── kube-state-metrics ───────────────────────────────────────────────────────
+kube-state-metrics:
+  # Ограничиваем до нужных ресурсов — убираем secrets/configmaps/leases/
+  # endpointslices/CSR/webhooks/resourcequotas, которые создают тысячи объектов
+  # и перегружают API-клиент и метрики-ответ.
+  collectors:
+    - cronjobs
+    - daemonsets
+    - deployments
+    - horizontalpodautoscalers
+    - ingresses
+    - jobs
+    - namespaces
+    - nodes
+    - persistentvolumeclaims
+    - persistentvolumes
+    - poddisruptionbudgets
+    - pods
+    - replicasets
+    - replicationcontrollers
+    - services
+    - statefulsets
+    - storageclasses
+
+  # Увеличиваем scrape timeout, чтобы Prometheus не рвал соединение раньше времени
+  prometheus:
+    monitor:
+      scrapeTimeout: 30s
+
+  livenessProbe:
+    httpGet:
+      path: /livez
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 30
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: 8081
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    timeoutSeconds: 30
+    failureThreshold: 3
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

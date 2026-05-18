@@ -1,0 +1,16 @@
+---
+# Mailcow configuration variables
+# Secrets (mailcow_dbpass, mailcow_dbroot) are in vault.yml
+
+mailcow_hostname: "mail.cards.myapp.example.com"
+
+mailcow_mail_domains:
+  - cards.myapp.example.com
+
+mailcow_timezone: "Europe/Moscow"
+
+# Disable Solr (full-text search) to save ~512MB RAM
+mailcow_skip_solr: "y"
+
+# Watchdog email alerts — set to an admin address after first deploy
+mailcow_watchdog_notify_email: ""

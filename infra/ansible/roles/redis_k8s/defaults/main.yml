@@ -1,0 +1,14 @@
+---
+# ── Redis K8s (native deployment, no persistence) ────────────────────────────
+redis_namespace: databases
+redis_name: "{{ env_name }}-redis"
+redis_image: "redis:7-alpine"
+
+redis_password: "{{ vault_redis_password | default('CHANGE_ME') }}"
+
+redis_resources_requests_cpu: "100m"
+redis_resources_requests_memory: "128Mi"
+redis_resources_limits_cpu: "500m"
+redis_resources_limits_memory: "256Mi"
+
+redis_port: 6379

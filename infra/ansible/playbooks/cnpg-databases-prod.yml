@@ -1,0 +1,21 @@
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# CNPG Databases – Prod
+#
+# Prerequisites:
+#   1. k8s-apps-prod.yml (CNPG operator + cluster must be up)
+#   2. make kubeconfig ENV=prod
+#
+# Run:
+#   ansible-playbook playbooks/cnpg-databases-prod.yml
+# ──────────────────────────────────────────────────────────────────────────────
+- name: Create databases in CNPG cluster (prod)
+  hosts: k8s_apps_prod
+  gather_facts: false
+
+  vars:
+    env_name: prod
+
+  roles:
+    - role: cnpg_databases
+      tags: [cnpg_databases, databases]

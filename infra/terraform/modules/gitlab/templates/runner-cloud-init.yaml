@@ -1,0 +1,13 @@
+#cloud-config
+users:
+  - name: ubuntu
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+%{ for k in ssh_public_keys ~}
+      - ${k}
+%{ endfor ~}
+
+runcmd:
+  - apt-get update
+  - apt-get upgrade -y

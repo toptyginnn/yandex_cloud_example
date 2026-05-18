@@ -1,0 +1,22 @@
+---
+# Deploy Mailcow mail server
+#
+# Prerequisites:
+#   1. Terraform infra environment applied (mailcow VM exists)
+#   2. Ansible Vault password available (~/.ansible_vault_password)
+#   3. DNS configured:
+#        A    mail.cards.myapp.example.com  → <mailcow_public_ip>
+#        MX   cards.myapp.example.com       → mail.cards.myapp.example.com (priority 10)
+#        PTR  <mailcow_public_ip> → mail.cards.myapp.example.com  (set in Yandex Cloud console)
+#        TXT  cards.myapp.example.com       → "v=spf1 mx -all"
+#
+# Run:
+#   ansible-playbook playbooks/mailcow.yml -i inventories/hosts.yml
+
+- name: Deploy Mailcow
+  hosts: mailcow
+  become: true
+
+  roles:
+    - role: docker_host
+    - role: mailcow

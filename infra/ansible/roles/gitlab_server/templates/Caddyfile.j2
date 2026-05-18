@@ -1,0 +1,9 @@
+{% if gitlab_caddy_email | default('') | length > 0 %}
+{
+    email {{ gitlab_caddy_email }}
+}
+{% endif %}
+{{ gitlab_server_hostname }} {
+    encode zstd gzip
+    reverse_proxy gitlab:80
+}

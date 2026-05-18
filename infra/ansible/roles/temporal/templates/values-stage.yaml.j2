@@ -1,0 +1,128 @@
+# Temporal — stage values (external CNPG PostgreSQL)
+# Official chart: https://go.temporal.io/helm-charts
+
+server:
+  replicaCount: {{ temporal_server_replica_count }}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  config:
+    persistence:
+      defaultStore: default
+      default:
+        driver: sql
+        sql:
+          driver: postgres12
+          host: {{ temporal_external_pg_host }}
+          port: {{ temporal_external_pg_port | default(5432) }}
+          database: temporal
+          user: {{ temporal_external_pg_user }}
+          password: {{ temporal_external_pg_password }}
+          maxConns: 20
+          maxIdleConns: 20
+          maxConnLifetime: "1h"
+      visibility:
+        driver: sql
+        sql:
+          driver: postgres12
+          host: {{ temporal_external_pg_host }}
+          port: {{ temporal_external_pg_port | default(5432) }}
+          database: temporal_visibility
+          user: {{ temporal_external_pg_user }}
+          password: {{ temporal_external_pg_password }}
+          maxConns: 10
+          maxIdleConns: 10
+          maxConnLifetime: "1h"
+
+frontend:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+history:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+matching:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+worker:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+web:
+  enabled: {{ temporal_web_enabled | lower }}
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: true
+    className: "{{ temporal_ingress_class }}"
+    annotations:
+      cert-manager.io/cluster-issuer: "{{ temporal_cluster_issuer }}"
+    hosts:
+      - "{{ temporal_ingress_hostname }}"
+    tls:
+      - secretName: temporal-web-tls
+        hosts:
+          - "{{ temporal_ingress_hostname }}"
+
+admintools:
+  enabled: {{ temporal_admintools_enabled | lower }}
+
+schema:
+  createDatabase:
+    enabled: false
+
+cassandra:
+  enabled: false
+
+mysql:
+  enabled: false
+
+postgresql:
+  enabled: false
+
+elasticsearch:
+  enabled: false
+
+prometheus:
+  enabled: false
+
+grafana:
+  enabled: false

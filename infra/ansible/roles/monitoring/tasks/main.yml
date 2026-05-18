@@ -1,0 +1,163 @@
+---
+# ── kube-prometheus-stack via Helm ────────────────────────────────────────────
+
+- name: Add Prometheus community Helm repository
+  kubernetes.core.helm_repository:
+    name: prometheus-community
+    repo_url: https://prometheus-community.github.io/helm-charts
+  become: false
+
+- name: Create monitoring namespace
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ monitoring_namespace }}"
+    state: present
+  become: false
+
+- name: Template monitoring values
+  ansible.builtin.template:
+    src: "values-{{ env_name }}.yaml.j2"
+    dest: /tmp/monitoring-values.yaml
+    mode: "0600"
+  become: false
+
+- name: Install kube-prometheus-stack
+  kubernetes.core.helm:
+    name: "{{ monitoring_release_name }}"
+    chart_ref: prometheus-community/kube-prometheus-stack
+    chart_version: "{{ monitoring_chart_version }}"
+    release_namespace: "{{ monitoring_namespace }}"
+    create_namespace: false
+    wait: true
+    wait_timeout: 600s
+    values_files:
+      - /tmp/monitoring-values.yaml
+  become: false
+
+# ── VM nodes PrometheusRule ───────────────────────────────────────────────────
+
+- name: Apply VM nodes PrometheusRule
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ role_path }}/files/prometheusrule-vm-nodes.yaml"
+  become: false
+
+# ── Grafana viewer user ───────────────────────────────────────────────────────
+
+- name: Get Grafana pod name
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: "{{ monitoring_namespace }}"
+    label_selectors:
+      - "app.kubernetes.io/name=grafana"
+  register: grafana_pods_info
+  become: false
+
+- name: Start kubectl port-forward to Grafana (async)
+  ansible.builtin.shell: >
+    kubectl port-forward -n {{ monitoring_namespace }}
+    pod/{{ grafana_pods_info.resources[0].metadata.name }}
+    13000:3000
+  async: 60
+  poll: 0
+  register: grafana_pf_job
+  become: false
+
+- name: Wait for Grafana port-forward to be ready
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: 13000
+    delay: 3
+    timeout: 30
+  become: false
+
+- name: Create Grafana viewer user (idempotent)
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:13000/api/admin/users"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      name: "Developer"
+      login: "viewer"
+      password: "{{ monitoring_grafana_viewer_password }}"
+      role: "Viewer"
+    user: "admin"
+    password: "{{ monitoring_grafana_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: [200, 412]   # 412 = пользователь уже существует
+  register: viewer_user_result
+  become: false
+
+# ── Grafana folder permissions ────────────────────────────────────────────────
+# Viewer видит только папку "Logs"; все остальные папки — Editor+
+
+- name: Get all Grafana folders
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:13000/api/folders?limit=100"
+    method: GET
+    user: "admin"
+    password: "{{ monitoring_grafana_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+  register: grafana_all_folders
+  become: false
+
+- name: Restrict non-Logs folders to Editor+ (hide from viewer)
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:13000/api/folders/{{ item.uid }}/permissions"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      items:
+        - role: "Editor"
+          permission: 2
+        - role: "Admin"
+          permission: 4
+    user: "admin"
+    password: "{{ monitoring_grafana_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: [200]
+  loop: "{{ grafana_all_folders.json | selectattr('title', 'ne', 'Logs') | list }}"
+  loop_control:
+    label: "{{ item.title }}"
+  become: false
+
+- name: Set Logs folder permissions (Viewer can view)
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:13000/api/folders/{{ item.uid }}/permissions"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      items:
+        - role: "Viewer"
+          permission: 1
+        - role: "Editor"
+          permission: 2
+        - role: "Admin"
+          permission: 4
+    user: "admin"
+    password: "{{ monitoring_grafana_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: [200]
+  loop: "{{ grafana_all_folders.json | selectattr('title', 'equalto', 'Logs') | list }}"
+  loop_control:
+    label: "{{ item.title }}"
+  become: false
+
+# ── Stop port-forward ─────────────────────────────────────────────────────────
+
+- name: Stop kubectl port-forward
+  ansible.builtin.async_status:
+    jid: "{{ grafana_pf_job.ansible_job_id }}"
+    mode: cleanup
+  become: false

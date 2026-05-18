@@ -1,0 +1,15 @@
+# CloudNativePG operator — values for a small team (<5 people)
+# Single operator replica, minimal resources
+
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+monitoring:
+  podMonitorEnabled: false

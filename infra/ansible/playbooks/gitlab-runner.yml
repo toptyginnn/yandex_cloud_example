@@ -1,0 +1,7 @@
+---
+- name: Configure GitLab runners
+  hosts: gitlab_runners
+  become: true
+  roles:
+    - docker_host
+    - gitlab_runner

@@ -1,0 +1,4 @@
+gitlab_runner_name: stage-runner
+gitlab_runner_tags:
+  - stage
+

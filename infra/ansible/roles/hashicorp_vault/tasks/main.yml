@@ -1,0 +1,82 @@
+---
+# ── HashiCorp Vault via Helm (Yandex Cloud Marketplace OCI chart) ─────────────
+# Chart: oci://cr.yandex/yc-marketplace/yandex-cloud/vault/chart/vault
+# Включает нативную поддержку Yandex KMS auto-unseal
+
+- name: Create Vault namespace
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ hashicorp_vault_namespace }}"
+    state: present
+  become: false
+
+- name: Template Vault Helm values
+  ansible.builtin.template:
+    src: "values-{{ env_name }}.yaml.j2"
+    dest: "/tmp/vault-values-{{ env_name }}.yaml"
+    mode: "0600"
+  become: false
+
+# wait: false — на первой установке поды не станут Ready до инициализации.
+# С Yandex KMS auto-unseal достаточно выполнить только vault operator init
+# (без vault operator unseal — KMS сделает это автоматически).
+- name: Install / upgrade HashiCorp Vault
+  kubernetes.core.helm:
+    name: "{{ hashicorp_vault_release_name }}"
+    chart_ref: "oci://cr.yandex/yc-marketplace/yandex-cloud/vault/chart/vault"
+    chart_version: "{{ hashicorp_vault_chart_version }}"
+    release_namespace: "{{ hashicorp_vault_namespace }}"
+    create_namespace: true
+    wait: false
+    values_files:
+      - "/tmp/vault-values-{{ env_name }}.yaml"
+  become: false
+
+- name: Wait for Vault pod(s) to reach Running phase
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ hashicorp_vault_namespace }}"
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "component=server"
+  register: _vault_pods
+  until: >-
+    _vault_pods.resources | length >= hashicorp_vault_replicas and
+    (_vault_pods.resources
+     | selectattr('status.phase', 'equalto', 'Running')
+     | list | length) >= hashicorp_vault_replicas
+  retries: 30
+  delay: 10
+  become: false
+
+# ── Post-install instructions ─────────────────────────────────────────────────
+
+- name: Check Vault init status
+  kubernetes.core.k8s_exec:
+    namespace: "{{ hashicorp_vault_namespace }}"
+    pod: "{{ hashicorp_vault_release_name }}-0"
+    command: vault status -format=json
+  register: _vault_status
+  failed_when: false
+  become: false
+
+- name: Show post-install instructions (fresh install)
+  ansible.builtin.debug:
+    msg: |
+      ╔══════════════════════════════════════════════════════════════════╗
+      ║  HashiCorp Vault – требуется ручная инициализация               ║
+      ╠══════════════════════════════════════════════════════════════════╣
+      ║  Инициализация (сохрани recovery keys и root token!):           ║
+      ║    kubectl -n {{ hashicorp_vault_namespace }} exec -it vault-0 -- \
+      ║      vault operator init                                         ║
+      ║                                                                  ║
+      ║  Yandex KMS auto-unseal активен — vault operator unseal        ║
+      ║  выполнять НЕ НУЖНО. Vault откроется автоматически.            ║
+      ╚══════════════════════════════════════════════════════════════════╝
+  when: >-
+    _vault_status.rc is not defined or
+    _vault_status.rc == 1 or
+    ((_vault_status.stdout | default('{}') | from_json).initialized | default(false)) == false
+  become: false

@@ -1,0 +1,48 @@
+---
+# ── Grafana Loki + Promtail via Helm ──────────────────────────────────────────
+
+- name: Add Grafana Helm repository
+  kubernetes.core.helm_repository:
+    name: grafana
+    repo_url: https://grafana.github.io/helm-charts
+  become: false
+
+- name: Template Loki values
+  ansible.builtin.template:
+    src: "values-loki-{{ env_name }}.yaml.j2"
+    dest: /tmp/loki-values.yaml
+    mode: "0600"
+  become: false
+
+- name: Template Promtail values
+  ansible.builtin.template:
+    src: values-promtail.yaml.j2
+    dest: /tmp/promtail-values.yaml
+    mode: "0600"
+  become: false
+
+- name: Install Loki
+  kubernetes.core.helm:
+    name: "{{ loki_release_name }}"
+    chart_ref: grafana/loki
+    chart_version: "{{ loki_chart_version }}"
+    release_namespace: "{{ loki_namespace }}"
+    create_namespace: false
+    wait: true
+    wait_timeout: 300s
+    values_files:
+      - /tmp/loki-values.yaml
+  become: false
+
+- name: Install Promtail
+  kubernetes.core.helm:
+    name: "{{ loki_promtail_release_name }}"
+    chart_ref: grafana/promtail
+    chart_version: "{{ loki_promtail_chart_version }}"
+    release_namespace: "{{ loki_namespace }}"
+    create_namespace: false
+    wait: true
+    wait_timeout: 120s
+    values_files:
+      - /tmp/promtail-values.yaml
+  become: false

@@ -1,0 +1,22 @@
+## cloud-init configuration for Mailcow host
+#cloud-config
+
+users:
+  - name: ubuntu
+    gecos: "Mailcow host admin"
+    lock_passwd: true
+    shell: /bin/bash
+    primary_group: ubuntu
+    groups: [sudo]
+    sudo:
+      - "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys: ${jsonencode(ssh_public_keys)}
+
+runcmd:
+  - apt-get update
+  - apt-get upgrade -y
+  - mkdir -p ${data_mount_path}
+  - bash -lc "for i in $(seq 1 30); do [ -b ${data_disk_device} ] && exit 0; sleep 1; done; echo 'Mailcow data disk not found: ${data_disk_device}' >&2; exit 1"
+  - bash -lc "blkid ${data_disk_device} || mkfs.ext4 -F ${data_disk_device}"
+  - bash -lc "UUID=$(blkid -s UUID -o value ${data_disk_device}); grep -q \"UUID=$UUID ${data_mount_path} ext4 defaults,nofail 0 2\" /etc/fstab || echo \"UUID=$UUID ${data_mount_path} ext4 defaults,nofail 0 2\" >> /etc/fstab"
+  - mount -a

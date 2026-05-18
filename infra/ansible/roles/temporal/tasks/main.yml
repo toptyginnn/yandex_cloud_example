@@ -1,0 +1,66 @@
+---
+# ── Temporal via Helm (official chart) ───────────────────────────────────────
+
+- name: Add Temporal Helm repository
+  kubernetes.core.helm_repository:
+    name: temporal
+    repo_url: https://go.temporal.io/helm-charts
+  become: false
+
+- name: Create Temporal namespace
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ temporal_namespace }}"
+    state: present
+  become: false
+
+- name: Template Temporal values
+  ansible.builtin.template:
+    src: "values-{{ env_name }}.yaml.j2"
+    dest: /tmp/temporal-values.yaml
+    mode: "0600"
+  become: false
+
+- name: Install Temporal
+  kubernetes.core.helm:
+    name: "{{ temporal_release_name }}"
+    chart_ref: temporal/temporal
+    chart_version: "{{ temporal_chart_version }}"
+    release_namespace: "{{ temporal_namespace }}"
+    create_namespace: true
+    wait: true
+    wait_timeout: 600s
+    values_files:
+      - /tmp/temporal-values.yaml
+  become: false
+
+- name: Wait for admintools pod
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: "{{ temporal_namespace }}"
+    label_selectors:
+      - app.kubernetes.io/component=admintools
+  register: temporal_admintools_pod
+  until: >-
+    temporal_admintools_pod.resources | length > 0 and
+    temporal_admintools_pod.resources[0].status.phase == 'Running'
+  retries: 30
+  delay: 10
+  become: false
+  when: temporal_admintools_enabled | bool
+
+- name: Register Temporal namespaces
+  kubernetes.core.k8s_exec:
+    namespace: "{{ temporal_namespace }}"
+    pod: "{{ temporal_admintools_pod.resources[0].metadata.name }}"
+    command: tctl namespace register --retention {{ item.retention | default(3) }} {{ item.name }}
+  loop: "{{ temporal_namespaces }}"
+  register: ns_result
+  failed_when: >-
+    ns_result.rc != 0 and
+    'already registered' not in (ns_result.stderr | default('')) and
+    'already exists' not in (ns_result.stdout | default('')) and
+    'AlreadyExists' not in (ns_result.stdout | default(''))
+  become: false
+  when: temporal_admintools_enabled | bool and temporal_namespaces is defined

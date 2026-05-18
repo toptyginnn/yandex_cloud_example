@@ -1,0 +1,42 @@
+# Secrets & credentials
+*.auto.tfvars
+*.tfvars.local
+.env
+.env.local
+.env.*.local
+!.env.sample
+!.env.development
+!.env.example
+*.json.key
+*-sa-key.json
+
+# Terraform state
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfplan
+.terraform.lock.hcl
+
+# Ansible secrets
+group_vars/all.yml
+!group_vars/all.yml.example
+inventories/hosts.yml
+!inventories/hosts.yml.example
+host_vars/*.yml
+!host_vars/*.yml.example
+*.vault
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+.next/
+
+# macOS
+.DS_Store

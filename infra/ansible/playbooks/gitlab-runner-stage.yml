@@ -1,0 +1,17 @@
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# GitLab Runner – Stage
+#
+# Prerequisites:
+#   1. tofu apply ENV=stage (creates stage runner VM)
+#   2. Set gitlab_runner_token in inventories/host_vars/stage-runner.yml
+#
+# Run:
+#   ansible-playbook playbooks/gitlab-runner-stage.yml
+# ──────────────────────────────────────────────────────────────────────────────
+- name: Configure GitLab runner (stage)
+  hosts: stage-runner
+  become: true
+  roles:
+    - docker_host
+    - gitlab_runner

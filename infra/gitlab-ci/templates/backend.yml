@@ -1,0 +1,250 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Backend CI/CD Pipeline Template
+# Included by myapp/backend repo via:
+#   include:
+#     - project: 'myapp/infra'
+#       ref: main
+#       file: '/gitlab-ci/templates/backend.yml'
+#
+# Required GitLab CI/CD Variables (set at group level):
+#   YC_REGISTRY_ID        — Yandex Container Registry ID (cr.yandex/<id>)
+#   YC_SA_KEY             — SA authorized key JSON (for docker login), base64-encoded
+#   KUBECONFIG_STAGE      — kubeconfig for stage cluster, base64-encoded
+#   KUBECONFIG_PROD       — kubeconfig for prod cluster, base64-encoded
+#   BW_SERVER_URL         — Vaultwarden URL (e.g. https://vault.internal)
+#   BW_CLIENTID           — Bitwarden API client ID  (masked)
+#   BW_CLIENTSECRET       — Bitwarden API client secret (masked)
+#   BW_PASSWORD           — Vault master password (masked)
+#   BW_CA_CERT            — Internal CA certificate (File type, for self-signed TLS)
+#   RAILWAY_TOKEN         — Railway API token (masked, group level)
+#   RAILWAY_SERVICE_ID    — Railway service ID for backend dev (set at project level)
+# ──────────────────────────────────────────────────────────────────────────────
+
+variables:
+  APP_NAME: backend
+  IMAGE_REPO: cr.yandex/$YC_REGISTRY_ID/backend
+  CI_TOOLS_IMAGE: dtzar/helm-kubectl:3.17
+  HELM_CHART_PATH: gitlab-ci/helm/app
+  INFRA_REPO_URL: https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/myapp/infra.git
+  DEPLOY_TIMEOUT: "10m"
+
+stages:
+  - deploy-dev
+  - lint
+  - build
+  - deploy-stage
+  - deploy-prod
+  - notify
+
+# Не запускать пайплайн при изменении только .gitlab-ci.yml
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - .gitlab-ci.yml
+      when: never
+    - when: always
+
+# ── Anchors ──────────────────────────────────────────────────────────────────
+
+.registry_login: &registry_login
+  - mkdir -p $HOME/.docker
+  - |
+    AUTH=$(echo -n "json_key:$(echo "$YC_SA_KEY" | base64 -d)" | base64 | tr -d '\n')
+    echo "{\"auths\":{\"cr.yandex\":{\"auth\":\"$AUTH\"}}}" > $HOME/.docker/config.json
+
+.k8s_login_stage: &k8s_login_stage
+  - echo "$KUBECONFIG_STAGE" | base64 -d > /tmp/kubeconfig
+  - export KUBECONFIG=/tmp/kubeconfig
+
+.k8s_login_prod: &k8s_login_prod
+  - echo "$KUBECONFIG_PROD" | base64 -d > /tmp/kubeconfig
+  - export KUBECONFIG=/tmp/kubeconfig
+
+.clone_infra: &clone_infra
+  - |
+    git clone --depth 1 --branch main "$INFRA_REPO_URL" /tmp/infra
+    HELM_CHART="/tmp/infra/${HELM_CHART_PATH}"
+    SCRIPTS_DIR="/tmp/infra/gitlab-ci/scripts"
+
+# ── Deploy Dev (Railway) ──────────────────────────────────────────────────────
+
+deploy-dev:
+  stage: deploy-dev
+  image: node:20-slim
+  tags:
+    - docker
+  script:
+    - echo "Token ${RAILWAY_TOKEN:0:8}"
+    - npm install -g @railway/cli
+    - railway status
+    - railway up --service "$RAILWAY_SERVICE_ID" --detach
+  environment:
+    name: dev
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+# ── Lint ─────────────────────────────────────────────────────────────────────
+
+lint:
+  stage: lint
+  image: python:3.12-slim
+  tags:
+    - docker
+  script:
+    - pip install ruff --quiet
+    - ruff check .
+    - ruff format --check .
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stage"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+
+# ── Build ─────────────────────────────────────────────────────────────────────
+
+build:
+  stage: build
+  image: docker:27
+  variables:
+    DOCKER_HOST: "unix:///var/run/docker.sock"
+  tags:
+    - docker
+  before_script:
+    - *registry_login
+  script:
+    - |
+      # Determine image tag
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        TAG="prod-${CI_COMMIT_SHORT_SHA}"
+        EXTRA_TAGS="--tag ${IMAGE_REPO}:prod-latest"
+      elif [ "$CI_COMMIT_BRANCH" = "stage" ]; then
+        TAG="stage-${CI_COMMIT_SHORT_SHA}"
+        EXTRA_TAGS="--tag ${IMAGE_REPO}:stage-latest"
+      elif [ -n "$CI_COMMIT_TAG" ]; then
+        TAG="${CI_COMMIT_TAG}"
+        EXTRA_TAGS="--tag ${IMAGE_REPO}:latest"
+      else
+        TAG="dev-${CI_COMMIT_SHORT_SHA}"
+        EXTRA_TAGS=""
+      fi
+
+      docker build \
+        --cache-from "${IMAGE_REPO}:stage-latest" \
+        --label "git.commit=${CI_COMMIT_SHA}" \
+        --label "git.branch=${CI_COMMIT_BRANCH}" \
+        --label "build.job=${CI_JOB_ID}" \
+        --tag "${IMAGE_REPO}:${TAG}" \
+        $EXTRA_TAGS \
+        .
+
+      docker push "${IMAGE_REPO}:${TAG}"
+      [ -n "$EXTRA_TAGS" ] && docker push "$(echo $EXTRA_TAGS | awk '{print $2}')" || true
+
+      echo "IMAGE_TAG=${TAG}" >> build.env
+  artifacts:
+    reports:
+      dotenv: build.env
+    expire_in: 1 hour
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stage"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+    - if: '$CI_COMMIT_BRANCH == "stage"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ── Deploy Stage ──────────────────────────────────────────────────────────────
+
+deploy-stage:
+  stage: deploy-stage
+  image: $CI_TOOLS_IMAGE
+  tags:
+    - stage
+  needs:
+    - job: build
+      artifacts: true
+  before_script:
+    - *k8s_login_stage
+    - *clone_infra
+  script:
+    - |
+      bash "${SCRIPTS_DIR}/deploy.sh" \
+        --app      "${APP_NAME}" \
+        --env      "stage" \
+        --image    "${IMAGE_REPO}:${IMAGE_TAG}" \
+        --chart    "${HELM_CHART}" \
+        --values   "${HELM_CHART}/${HELM_VALUES_STAGE}" \
+        --namespace "${NAMESPACE_STAGE}" \
+        --timeout  "${DEPLOY_TIMEOUT}"
+  environment:
+    name: stage
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "stage"'
+
+# ── Deploy Prod ───────────────────────────────────────────────────────────────
+
+deploy-prod:
+  stage: deploy-prod
+  image: $CI_TOOLS_IMAGE
+  tags:
+    - docker
+    - prod
+  needs:
+    - job: build
+      artifacts: true
+  before_script:
+    - *k8s_login_prod
+    - *clone_infra
+  script:
+    - |
+      bash "${SCRIPTS_DIR}/deploy.sh" \
+        --app      "${APP_NAME}" \
+        --env      "prod" \
+        --image    "${IMAGE_REPO}:${IMAGE_TAG}" \
+        --chart    "${HELM_CHART}" \
+        --values   "${HELM_CHART}/${HELM_VALUES_PROD}" \
+        --namespace "${NAMESPACE_PROD}" \
+        --timeout  "${DEPLOY_TIMEOUT}"
+  environment:
+    name: production
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+
+# ── Notify ────────────────────────────────────────────────────────────────────
+
+notify_pipeline_success:
+  stage: notify
+  image: curlimages/curl:latest
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - |
+      TEXT=$(printf '✅ <b>Пайплайн успешно завершён</b>\n\n📦 Проект: <b>%s</b>\n🔀 Ветка: <i>%s</i>\n👤 Автор: %s\n⏱ Время: %s сек\n\n🔗 <a href="%s">Посмотреть пайплайн</a>\n🔗 <a href="%s/-/commit/%s">Коммит</a>' \
+        "${CI_PROJECT_NAME}" "${CI_COMMIT_BRANCH}" "${GITLAB_USER_NAME}" "${CI_PIPELINE_DURATION}" \
+        "${CI_PIPELINE_URL}" "${CI_PROJECT_URL}" "${CI_COMMIT_SHA}")
+      curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+        -d "chat_id=${TELEGRAM_CHAT_ID}" \
+        -d "message_thread_id=<TELEGRAM_THREAD_ID>" \
+        -d "parse_mode=HTML" \
+        -d "disable_web_page_preview=true" \
+        --data-urlencode "text=${TEXT}"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "stage" || $CI_COMMIT_BRANCH == "dev"'
+      when: on_success
+
+notify_pipeline_failed:
+  stage: notify
+  image: curlimages/curl:latest
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - |
+      TEXT=$(printf '❌ <b>Пайплайн упал!</b>\n\n📦 Проект: <b>%s</b>\n🔀 Ветка: <i>%s</i>\n👤 Автор: %s\n\n🔗 <a href="%s">Открыть логи и исправить</a>' \
+        "${CI_PROJECT_NAME}" "${CI_COMMIT_BRANCH}" "${GITLAB_USER_NAME}" "${CI_PIPELINE_URL}")
+      curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+        -d "chat_id=${TELEGRAM_CHAT_ID}" \
+        -d "message_thread_id=<TELEGRAM_THREAD_ID>" \
+        -d "parse_mode=HTML" \
+        -d "disable_web_page_preview=true" \
+        --data-urlencode "text=${TEXT}"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "stage" || $CI_COMMIT_BRANCH == "dev"'
+      when: on_failure

@@ -1,0 +1,6 @@
+---
+- name: Restart mailcow
+  ansible.builtin.command:
+    cmd: docker compose restart
+    chdir: "{{ mailcow_install_dir }}"
+  changed_when: true

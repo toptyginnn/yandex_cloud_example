@@ -1,0 +1,33 @@
+---
+- name: Create GitLab project directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /opt/gitlab
+    - /opt/gitlab/config
+    - /opt/gitlab/logs
+    - /opt/gitlab/data
+    - /opt/gitlab/caddy
+    - /opt/gitlab/caddy/data
+    - /opt/gitlab/caddy/config
+
+- name: Render GitLab docker-compose stack
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /opt/gitlab/docker-compose.yml
+    mode: "0644"
+
+- name: Render Caddyfile for GitLab
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: /opt/gitlab/Caddyfile
+    mode: "0644"
+
+- name: Start GitLab stack
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: /opt/gitlab
+  register: gitlab_compose_up
+  changed_when: "'Container' in gitlab_compose_up.stdout or 'Creating' in gitlab_compose_up.stdout or 'Starting' in gitlab_compose_up.stdout or 'Recreating' in gitlab_compose_up.stdout"

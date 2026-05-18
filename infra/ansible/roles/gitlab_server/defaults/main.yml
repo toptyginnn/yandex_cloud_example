@@ -1,0 +1,28 @@
+---
+gitlab_server_image: gitlab/gitlab-ce:latest
+gitlab_server_hostname: gitlab.myapp.example.com
+gitlab_external_url: https://gitlab.myapp.example.com
+gitlab_http_port: 80
+gitlab_https_port: 443
+gitlab_ssh_port: 2222
+gitlab_caddy_image: caddy:2
+gitlab_caddy_email: "mnikonov@gmail.com"
+
+gitlab_backup_s3_enabled: false
+gitlab_backup_s3_bucket: ""
+gitlab_backup_s3_region: ru-central1
+gitlab_backup_s3_endpoint: https://storage.yandexcloud.net
+gitlab_backup_s3_access_key: "{{ vault_gitlab_backup_s3_access_key | default('') }}"
+gitlab_backup_s3_secret_key: "{{ vault_gitlab_backup_s3_secret_key | default('') }}"
+
+gitlab_smtp_enabled: true
+gitlab_smtp_address: "smtp.yandex.ru"
+gitlab_smtp_port: 465
+gitlab_smtp_user: "vadim@myapp.example.com"
+gitlab_smtp_password: "{{ vault_gitlab_smtp_password | default('') }}"
+gitlab_smtp_domain: "btb.pro"
+gitlab_smtp_authentication: "login"
+gitlab_smtp_starttls: false
+gitlab_smtp_tls: true
+gitlab_email_from: "gitlab@btb.pro"
+gitlab_email_reply_to: "gitlab@btb.pro"

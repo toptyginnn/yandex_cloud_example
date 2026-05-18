@@ -1,0 +1,30 @@
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# HashiCorp Vault – Prod (HA, 3 replicas)
+#
+# Prerequisites:
+#   1. tofu apply ENV=prod  (creates K8s cluster)
+#   2. make kubeconfig ENV=prod
+#
+# Run:
+#   ansible-playbook playbooks/hashicorp-vault-prod.yml
+#
+# После первой установки выполни init и unseal вручную:
+#   kubectl -n vault exec -it vault-0 -- vault operator init
+#   kubectl -n vault exec -it vault-0 -- vault operator unseal <KEY>  # 3 раза
+#
+# Присоединение peer-нод к Raft кластеру (HA):
+#   kubectl -n vault exec -it vault-1 -- vault operator raft join http://vault-0.vault-internal:8200
+#   kubectl -n vault exec -it vault-1 -- vault operator unseal <KEY>  # 3 раза
+#   # Повтори для vault-2
+# ──────────────────────────────────────────────────────────────────────────────
+- name: Deploy HashiCorp Vault to prod
+  hosts: k8s_apps_prod
+  gather_facts: false
+
+  vars:
+    env_name: prod
+
+  roles:
+    - role: hashicorp_vault
+      tags: [hashicorp_vault, vault]

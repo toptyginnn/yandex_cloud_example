@@ -1,0 +1,125 @@
+services:
+  postgres:
+    image: postgres:16.1
+    hostname: postgres
+    container_name: postgres
+    command: postgres -c 'max_connections=4000'
+    environment:
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_USER: "postgres"
+      PGDATA: "/pgdata"
+    restart: always
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - pgdata:/pgdata
+    networks:
+      - otc
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.5
+    hostname: keycloak
+    container_name: keycloak
+    entrypoint: "/opt/keycloak/bin/kc.sh start --import-realm"
+#    entrypoint: "/opt/keycloak/bin/kc.sh start --features=scripts --import-realm"
+#    entrypoint: "/opt/keycloak/bin/kc.sh export --dir /opt/keycloak/data/import --realm otc" # Uncomment to export realm
+    environment:
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_STRICT_BACKCHANNEL: false
+      KC_HTTP_ENABLED: true
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HEALTH_ENABLED: true
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN_URL: http://localhost:8080
+      KC_DB: postgres
+      KC_DB_SCHEMA: public
+      KC_DB_URL: jdbc:postgresql://postgres/keycloak
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgres
+    ports:
+      - 8080:8080
+    restart: no
+    depends_on:
+      - postgres
+    networks:
+      - otc
+    volumes:
+      - ./keycloak/realm:/opt/keycloak/data/import
+      - ./keycloak/providers:/opt/keycloak/providers
+
+  rabbitmq:
+    image: rabbitmq:4
+    hostname: rabbitmq
+    container_name: rabbitmq
+    ports:
+      - 5672:5672
+      - 15672:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+    configs:
+      - source: rabbitmq-plugins
+        target: /etc/rabbitmq/enabled_plugins
+    
+    volumes:
+      - ./rabbitmq/lib:/var/lib/rabbitmq
+      - ./rabbitmq/log:/var/log/rabbitmq
+
+  temporal:
+    image: temporalio/auto-setup
+    hostname: temporal
+    container_name: temporal
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PWD=postgres
+      - POSTGRES_SEEDS=postgres
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development.yaml
+    networks:
+      - otc
+    ports:
+      - 7233:7233
+    volumes:
+      - ./temporal/dynamic-config:/etc/temporal/config/dynamicconfig
+      - ./logs/temporal:/app/logs
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    hostname: temporal-ui
+    container_name: temporal-ui
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:8080
+    networks:
+      - otc
+    ports:
+      - 8080:8080
+
+
+configs:
+  rabbitmq-plugins:
+    content: "[rabbitmq_management]."
+
+networks:
+  otc:
+    name: app
+    driver: bridge
+
+volumes:
+  pgdata:
+    name: pgdata
+    driver: local

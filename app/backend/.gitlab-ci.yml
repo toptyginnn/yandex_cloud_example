@@ -1,0 +1,34 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# otc/backend — GitLab CI
+#
+# Only main branch is deployed — to the prod cluster (manual trigger).
+# Dev/stage environments are managed manually via Railway.
+#
+# Project-level variables (Settings → CI/CD → Variables):
+#   (none required beyond group-level)
+#
+# Group-level variables (set at myapp group level):
+#   YC_REGISTRY_ID, YC_SA_KEY, KUBECONFIG_PROD,
+#   BW_SERVER_URL, BW_CLIENTID, BW_CLIENTSECRET, BW_PASSWORD, BW_CA_CERT,
+#   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+# ──────────────────────────────────────────────────────────────────────────────
+
+variables:
+  APP_NAME: app-backend
+  IMAGE_REPO: cr.yandex/$YC_REGISTRY_ID/app-backend
+  NAMESPACE_PROD: app
+  HELM_VALUES_PROD: values-app-backend-prod.yaml
+
+include:
+  - project: 'myapp/infra'
+    ref: main
+    file: '/gitlab-ci/templates/backend.yml'
+
+# ── Disable jobs not applicable to OTC ───────────────────────────────────────
+deploy-dev:
+  rules:
+    - when: never
+
+deploy-stage:
+  rules:
+    - when: never

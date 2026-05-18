@@ -1,0 +1,80 @@
+---
+- name: Create GitLab Runner project directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /opt/gitlab-runner
+    - /opt/gitlab-runner/config
+
+- name: Render GitLab Runner docker-compose stack
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /opt/gitlab-runner/docker-compose.yml
+    mode: "0644"
+
+- name: Check whether runner is already registered
+  ansible.builtin.stat:
+    path: /opt/gitlab-runner/config/config.toml
+  register: gitlab_runner_config
+
+- name: Register GitLab Runner
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - -v
+      - /opt/gitlab-runner/config:/etc/gitlab-runner
+      - -v
+      - /var/run/docker.sock:/var/run/docker.sock
+      - "{{ gitlab_runner_image }}"
+      - register
+      - --non-interactive
+      - --url
+      - "{{ gitlab_external_url }}"
+      - --registration-token
+      - "{{ gitlab_runner_token }}"
+      - --executor
+      - docker
+      - --docker-image
+      - "{{ gitlab_runner_default_image }}"
+      - --description
+      - "{{ gitlab_runner_name }}"
+      - --tag-list
+      - "{{ gitlab_runner_tags | join(',') }}"
+      - --run-untagged={{ 'true' if gitlab_runner_run_untagged else 'false' }}
+      - --locked=false
+      - --docker-volumes
+      - /var/run/docker.sock:/var/run/docker.sock
+      - --docker-volumes
+      - /cache
+  when: not gitlab_runner_config.stat.exists
+
+- name: Ensure docker socket is mounted in runner job containers
+  ansible.builtin.replace:
+    path: /opt/gitlab-runner/config/config.toml
+    regexp: 'volumes = \[.*\]'
+    replace: 'volumes = ["/var/run/docker.sock:/var/run/docker.sock", "/cache"]'
+  notify: restart gitlab-runner
+
+- name: Login to YC Container Registry
+  ansible.builtin.command:
+    argv:
+      - docker
+      - login
+      - cr.yandex
+      - --username
+      - json_key
+      - --password
+      - "{{ yc_sa_key }}"
+  no_log: true
+  when: yc_sa_key is defined and yc_sa_key != ""
+
+- name: Start GitLab Runner stack
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: /opt/gitlab-runner
+  register: gitlab_runner_compose_up
+  changed_when: "'Container' in gitlab_runner_compose_up.stdout or 'Creating' in gitlab_runner_compose_up.stdout or 'Starting' in gitlab_runner_compose_up.stdout or 'Recreating' in gitlab_runner_compose_up.stdout"

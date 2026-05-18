@@ -1,0 +1,33 @@
+---
+# ── CloudNativePG operator ────────────────────────────────────────────────────
+cnpg_operator_namespace: cnpg-system
+cnpg_operator_chart_version: "0.27.1"
+cnpg_operator_release_name: cnpg
+
+# ── CloudNativePG Cluster ─────────────────────────────────────────────────────
+cnpg_namespace: databases
+cnpg_cluster_name: "{{ env_name }}-pg"
+cnpg_instances: 1
+cnpg_pg_version: "16"
+
+cnpg_pg_database: app
+cnpg_pg_user: app
+cnpg_pg_password: "{{ vault_cnpg_pg_password | default('CHANGE_ME') }}"
+
+cnpg_pvc_size: "10Gi"
+cnpg_storage_class: yc-network-ssd
+
+cnpg_resources_requests_cpu: "250m"
+cnpg_resources_requests_memory: "256Mi"
+cnpg_resources_limits_cpu: "500m"
+cnpg_resources_limits_memory: "512Mi"
+
+cnpg_max_connections: "100"
+cnpg_shared_buffers: "128MB"
+
+# ── Developer access LoadBalancer ─────────────────────────────────────────────
+# Set cnpg_dev_lb_enabled: true to expose PostgreSQL via an internal YC LB.
+# Requires VPN access to the subnet.
+cnpg_dev_lb_enabled: false
+cnpg_dev_lb_subnet_id: ""
+cnpg_dev_lb_ip: ""  # leave empty to get a dynamic IP from YC

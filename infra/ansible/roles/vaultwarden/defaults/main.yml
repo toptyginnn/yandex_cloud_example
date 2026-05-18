@@ -1,0 +1,21 @@
+---
+# ── Vaultwarden Helm chart ────────────────────────────────────────────────────
+vaultwarden_namespace: vaultwarden
+vaultwarden_release_name: vaultwarden
+vaultwarden_chart_version: "0.35.1"   # guerzon/vaultwarden
+
+vaultwarden_domain: "https://vault.internal"
+vaultwarden_admin_token: "{{ vault_vaultwarden_admin_token | default('CHANGE_ME') }}"
+
+vaultwarden_resources_requests_cpu: "50m"
+vaultwarden_resources_requests_memory: "64Mi"
+vaultwarden_resources_limits_cpu: "200m"
+vaultwarden_resources_limits_memory: "256Mi"
+
+vaultwarden_storage_size: "1Gi"
+vaultwarden_storage_class: yc-network-hdd
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
+vaultwarden_ingress_hostname: vault.internal
+vaultwarden_ingress_class: nginx-internal
+vaultwarden_cluster_issuer: internal-ca  # cert-manager ClusterIssuer name

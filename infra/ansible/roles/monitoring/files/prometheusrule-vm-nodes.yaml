@@ -1,0 +1,111 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: vm-nodes-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: vm-nodes
+      interval: 60s
+      rules:
+
+        # ── Доступность ───────────────────────────────────────────────────────
+        - alert: VMNodeDown
+          expr: up{job="vm-nodes"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "VM {{ $labels.hostname }} недоступна"
+            description: "node_exporter на {{ $labels.instance }} (role: {{ $labels.role }}) не отвечает более 2 минут."
+
+        # ── Диск: критический уровень (<10% свободно) ─────────────────────────
+        - alert: VMDiskSpaceCritical
+          expr: |
+            (
+              node_filesystem_avail_bytes{job="vm-nodes", fstype!~"tmpfs|devtmpfs|squashfs|overlay"}
+              / node_filesystem_size_bytes{job="vm-nodes", fstype!~"tmpfs|devtmpfs|squashfs|overlay"}
+            ) < 0.10
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Критически мало места на {{ $labels.instance }}"
+            description: "Раздел {{ $labels.mountpoint }} на {{ $labels.instance }} ({{ $labels.role }}): свободно {{ $value | humanizePercentage }}. Осталось менее 10%."
+
+        # ── Диск: предупреждение (<20% свободно) ──────────────────────────────
+        - alert: VMDiskSpaceWarning
+          expr: |
+            (
+              node_filesystem_avail_bytes{job="vm-nodes", fstype!~"tmpfs|devtmpfs|squashfs|overlay"}
+              / node_filesystem_size_bytes{job="vm-nodes", fstype!~"tmpfs|devtmpfs|squashfs|overlay"}
+            ) < 0.20
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Мало места на {{ $labels.instance }}"
+            description: "Раздел {{ $labels.mountpoint }} на {{ $labels.instance }} ({{ $labels.role }}): свободно {{ $value | humanizePercentage }}. Осталось менее 20%."
+
+        # ── CPU: высокая нагрузка (>85% в течение 10 минут) ──────────────────
+        - alert: VMHighCPU
+          expr: |
+            (
+              1 - avg by (instance, hostname, role) (
+                rate(node_cpu_seconds_total{job="vm-nodes", mode="idle"}[5m])
+              )
+            ) > 0.85
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Высокая нагрузка CPU на {{ $labels.instance }}"
+            description: "CPU на {{ $labels.instance }} ({{ $labels.role }}) загружен на {{ $value | humanizePercentage }} уже 10 минут."
+
+        # ── Память: высокое потребление (>90% занято) ─────────────────────────
+        - alert: VMHighMemory
+          expr: |
+            (
+              1 - (
+                node_memory_MemAvailable_bytes{job="vm-nodes"}
+                / node_memory_MemTotal_bytes{job="vm-nodes"}
+              )
+            ) > 0.90
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Высокое потребление памяти на {{ $labels.instance }}"
+            description: "Память на {{ $labels.instance }} ({{ $labels.role }}) занята на {{ $value | humanizePercentage }}."
+
+        # ── Load average: аномально высокий (> числа vCPU × 2) ───────────────
+        # Порог 8 покрывает типичные VM с 2–4 vCPU
+        - alert: VMHighLoadAverage
+          expr: node_load5{job="vm-nodes"} > 8
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Высокий load average на {{ $labels.instance }}"
+            description: "Load average (5m) на {{ $labels.instance }} ({{ $labels.role }}) составляет {{ $value | printf \"%.1f\" }}."
+
+        # ── Диск: быстрое заполнение (прогноз < 24 ч) ─────────────────────────
+        - alert: VMDiskFillingUp
+          expr: |
+            (
+              node_filesystem_avail_bytes{job="vm-nodes", fstype!~"tmpfs|devtmpfs|squashfs|overlay"}
+              / node_filesystem_size_bytes{job="vm-nodes", fstype!~"tmpfs|devtmpfs|squashfs|overlay"}
+            ) < 0.40
+            and
+            predict_linear(
+              node_filesystem_avail_bytes{job="vm-nodes", fstype!~"tmpfs|devtmpfs|squashfs|overlay"}[6h],
+              24 * 3600
+            ) < 0
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Раздел на {{ $labels.instance }} заполнится менее чем за 24 ч"
+            description: "Раздел {{ $labels.mountpoint }} на {{ $labels.instance }} ({{ $labels.role }}) при текущей скорости записи заполнится в течение суток."

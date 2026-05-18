@@ -1,0 +1,88 @@
+appName: app
+component: backend
+
+image:
+  repository: cr.yandex/REGISTRY_ID/app-backend
+
+port: 8000
+secretName: app-backend-secrets
+
+# Secrets in Vaultwarden (item: bt6-app-backend-stage):
+#   DB_URL                   — postgresql://user:pass@host:5432/db
+#   TELEGRAM_BOT_TOKEN       — bot token from @BotFather
+#   SERVICES_SECRET          — internal service-to-service secret
+#   KEYCLOAK_CLIENT_SECRET   — Keycloak admin-cli client secret
+
+env:
+  # Runtime
+  SERVICE_NAME: app
+  SERVICE_PORT: "8000"
+  NUM_WORKERS: "2"
+  DEBUG_MODE: "False"
+  PYTHONUNBUFFERED: "1"
+
+  # Logging
+  LOGGING_FILE_LEVEL: DEBUG
+  LOGGER_STDOUT: "True"
+  LOGGER_SERIALIZE: "True"
+  LOG_ROTATION: "True"
+  LOG_ENQUEUE: "False"
+
+  # DB connection pool (DB_URL comes from secrets)
+  MIN_CONNECTIONS: "1"
+  MAX_CONNECTIONS: "10"
+
+  # API
+  CORS_ALLOW_ORIGINS: '["https://app.stage.myapp.example.com"]'
+  API_SWAGGER_URL: /docs
+  API_OPENAPI_URL: /openapi.json
+  WEB_PANEL_URL: https://app.stage.myapp.example.com
+
+  # JWT
+  JWT_EXPIRES_IN_SECONDS: "3600000"
+
+  # Keycloak
+  KEYCLOAK_URL: http://keycloak.keycloak.svc.cluster.local:8080
+  KEYCLOAK_REALM: app
+  KEYCLOAK_CLIENT_ID: admin-cli
+  KEYCLOAK_SWAGGER_CLIENT_ID: swagger-ui
+  KEYCLOAK_THIS_APP_CLIENT_ID: app-backend
+  ACCESS_TOKEN_LIFESPAN: "900"
+
+  # Telegram webhook (TELEGRAM_BOT_TOKEN comes from secrets)
+  WEBHOOK_BASE_URL: https://api.app.stage.myapp.example.com
+  TG_LOGGER_HIGH_SECURITY_CHAT_ID: "-1002038754677"
+  TG_LOGGER_MEDIUM_SECURITY_CHAT_ID: "-1002038754677"
+  TG_LOGGER_LOW_SECURITY_CHAT_ID: "-1002038754677"
+
+ingress:
+  enabled: true
+  className: nginx-external
+  host: api.app.stage.myapp.example.com
+  tls: true
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+replicaCount: 1
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+
+probes:
+  startup:
+    path: /docs
+    failureThreshold: 30
+    periodSeconds: 10
+  liveness:
+    path: /docs
+    periodSeconds: 15
+    failureThreshold: 3
+  readiness:
+    path: /docs
+    periodSeconds: 10
+    failureThreshold: 3

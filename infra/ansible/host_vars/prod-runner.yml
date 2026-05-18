@@ -1,0 +1,4 @@
+gitlab_runner_name: prod-runner
+gitlab_runner_tags:
+  - prod
+gitlab_runner_token: CHANGE_ME_PROD_RUNNER_TOKEN

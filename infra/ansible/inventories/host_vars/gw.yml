@@ -1,0 +1,5 @@
+---
+vm_role: vpn-gateway
+# Заполнить внутренний IP после деплоя:
+#   cd infra/terraform/environments/infra && tofu output vpn_internal_ip
+monitoring_ip: "10.20.1.22"

@@ -1,0 +1,57 @@
+# Shared Docker defaults
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+# Netbird
+netbird_domain: gw.myapp.example.com
+netbird_caddy_email: mnikonov@gmail.com
+netbird_caddy_image: caddy:2
+
+# Image tags
+netbird_management_tag: latest
+netbird_signal_tag: latest
+netbird_dashboard_tag: latest
+netbird_coturn_tag: "4.6.2"
+netbird_crdb_tag: "v24.2.3"
+netbird_zitadel_tag: "v2.54.3"
+
+# Secrets (set via ansible-vault)
+netbird_turn_secret: "{{ vault_netbird_turn_secret | default('CHANGE_ME') }}"
+netbird_datastore_key: "{{ vault_netbird_datastore_key | default('CHANGE_ME') }}"
+netbird_zitadel_masterkey: "{{ vault_netbird_zitadel_masterkey | default('CHANGE_ME_32CHARS_BASE64KEY======') }}"
+netbird_zitadel_admin_username: "{{ vault_netbird_zitadel_admin_username | default('admin') }}"
+netbird_zitadel_admin_password: "{{ vault_netbird_zitadel_admin_password | default('Password1!') }}"
+
+# OIDC client IDs/secrets — created during initial Zitadel setup
+# See docs/netbird-zitadel-setup.md for how to obtain these values
+netbird_auth_client_id: "{{ vault_netbird_auth_client_id | default('') }}"
+netbird_device_client_id: "{{ vault_netbird_device_client_id | default('') }}"
+netbird_device_client_secret: "{{ vault_netbird_device_client_secret | default('') }}"
+netbird_pkce_client_id: "{{ vault_netbird_pkce_client_id | default('') }}"
+netbird_sa_client_id: "{{ vault_netbird_sa_client_id | default('') }}"
+netbird_sa_client_secret: "{{ vault_netbird_sa_client_secret | default('') }}"
+
+# GitLab server
+gitlab_server_image: gitlab/gitlab-ce:latest
+gitlab_server_hostname: gitlab.myapp.example.com
+gitlab_external_url: https://gitlab.myapp.example.com
+gitlab_http_port: 80
+gitlab_https_port: 443
+gitlab_ssh_port: 2222
+gitlab_caddy_image: caddy:2
+gitlab_caddy_email: mnikonov@gmail.com
+gitlab_backup_s3_enabled: false
+gitlab_backup_s3_bucket: ""
+gitlab_backup_s3_region: ru-central1
+gitlab_backup_s3_endpoint: https://storage.yandexcloud.net
+gitlab_backup_s3_access_key: ""
+gitlab_backup_s3_secret_key: ""
+
+# GitLab runner
+gitlab_runner_image: gitlab/gitlab-runner:latest
+gitlab_runner_default_image: alpine:latest
+gitlab_runner_run_untagged: false

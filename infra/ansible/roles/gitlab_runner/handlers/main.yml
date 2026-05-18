@@ -1,0 +1,6 @@
+---
+- name: restart gitlab-runner
+  ansible.builtin.command:
+    cmd: docker compose restart gitlab-runner
+    chdir: /opt/gitlab-runner
+  changed_when: true

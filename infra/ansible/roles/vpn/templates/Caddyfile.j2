@@ -1,0 +1,128 @@
+{
+    email {{ netbird_caddy_email }}
+    servers {
+        protocols h1 h2 h3
+    }
+}
+
+{{ netbird_domain }} {
+    # Netbird Signal gRPC
+    handle /signalexchange.SignalExchange/* {
+        reverse_proxy h2c://signal:10000
+    }
+
+    # Netbird Management gRPC (client connections)
+    handle /management.ManagementService/* {
+        reverse_proxy h2c://management:10443
+    }
+
+    # Netbird Management HTTP API
+    handle /api/* {
+        reverse_proxy management:10443
+    }
+
+    # Zitadel (OAuth / OIDC / Admin UI)
+    handle /ui/v2/login/* {
+        reverse_proxy http://zitadel:8080 {
+            header_up Host {http.request.host}
+            header_up X-Forwarded-Host {http.request.host}
+            header_up X-Forwarded-Proto {http.request.scheme}
+            header_up X-Forwarded-For {http.request.remote.host}
+        }
+    }
+    handle /ui/* {
+        reverse_proxy h2c://zitadel:8080 {
+            header_up Host {http.request.host}
+            header_up X-Forwarded-Host {http.request.host}
+            header_up X-Forwarded-Proto {http.request.scheme}
+            header_up X-Forwarded-For {http.request.remote.host}
+        }
+    }
+    handle /login* {
+        reverse_proxy h2c://zitadel:8080 {
+            header_up Host {http.request.host}
+            header_up X-Forwarded-Host {http.request.host}
+            header_up X-Forwarded-Proto {http.request.scheme}
+            header_up X-Forwarded-For {http.request.remote.host}
+        }
+    }
+    handle /zitadel* {
+        reverse_proxy h2c://zitadel:8080 {
+            header_up Host {http.request.host}
+            header_up X-Forwarded-Host {http.request.host}
+            header_up X-Forwarded-Proto {http.request.scheme}
+            header_up X-Forwarded-For {http.request.remote.host}
+        }
+    }
+    handle /oauth/v2/* {
+        reverse_proxy h2c://zitadel:8080 {
+            header_up Host {http.request.host}
+            header_up X-Forwarded-Host {http.request.host}
+            header_up X-Forwarded-Proto {http.request.scheme}
+            header_up X-Forwarded-For {http.request.remote.host}
+        }
+    }
+    handle /oidc/v1/* {
+        reverse_proxy h2c://zitadel:8080 {
+            header_up Host {http.request.host}
+            header_up X-Forwarded-Host {http.request.host}
+            header_up X-Forwarded-Proto {http.request.scheme}
+            header_up X-Forwarded-For {http.request.remote.host}
+        }
+    }
+    handle /openidconnect/* {
+        reverse_proxy h2c://zitadel:8080 {
+            header_up Host {http.request.host}
+            header_up X-Forwarded-Host {http.request.host}
+            header_up X-Forwarded-Proto {http.request.scheme}
+            header_up X-Forwarded-For {http.request.remote.host}
+        }
+    }
+    handle /.well-known/* {
+        reverse_proxy h2c://zitadel:8080 {
+            header_up Host {http.request.host}
+            header_up X-Forwarded-Host {http.request.host}
+            header_up X-Forwarded-Proto {http.request.scheme}
+            header_up X-Forwarded-For {http.request.remote.host}
+        }
+    }
+    handle /auth/v1/* {
+        reverse_proxy h2c://zitadel:8080 {
+            header_up Host {http.request.host}
+            header_up X-Forwarded-Host {http.request.host}
+            header_up X-Forwarded-Proto {http.request.scheme}
+            header_up X-Forwarded-For {http.request.remote.host}
+        }
+    }
+    handle /admin/v1/* {
+        reverse_proxy h2c://zitadel:8080 {
+            header_up Host {http.request.host}
+            header_up X-Forwarded-Host {http.request.host}
+            header_up X-Forwarded-Proto {http.request.scheme}
+            header_up X-Forwarded-For {http.request.remote.host}
+        }
+    }
+    handle /v1/* {
+        reverse_proxy h2c://zitadel:8080 {
+            header_up Host {http.request.host}
+            header_up X-Forwarded-Host {http.request.host}
+            header_up X-Forwarded-Proto {http.request.scheme}
+            header_up X-Forwarded-For {http.request.remote.host}
+        }
+    }
+
+    # Zitadel Management API
+    handle /management/* {
+        reverse_proxy h2c://zitadel:8080 {
+            header_up Host {http.request.host}
+            header_up X-Forwarded-Host {http.request.host}
+            header_up X-Forwarded-Proto {http.request.scheme}
+            header_up X-Forwarded-For {http.request.remote.host}
+        }
+    }
+
+    # Dashboard (fallthrough)
+    handle /* {
+        reverse_proxy dashboard:80
+    }
+}

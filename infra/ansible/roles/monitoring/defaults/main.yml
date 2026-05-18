@@ -1,0 +1,22 @@
+---
+# ── kube-prometheus-stack Helm chart ─────────────────────────────────────────
+# Verify latest: helm search repo prometheus-community/kube-prometheus-stack --versions | head -5
+monitoring_namespace: monitoring
+monitoring_release_name: kube-prometheus-stack
+monitoring_chart_version: "82.15.1"
+
+# ── Grafana ───────────────────────────────────────────────────────────────────
+monitoring_grafana_admin_password: "{{ vault_grafana_admin_password | default(lookup('env', 'GRAFANA_ADMIN_PASSWORD')) }}"
+monitoring_grafana_viewer_password: "{{ vault_grafana_viewer_password | default(lookup('env', 'GRAFANA_VIEWER_PASSWORD')) }}"
+monitoring_grafana_ingress_hostname: "grafana.{{ env_name }}.myapp.example.com"
+monitoring_grafana_ingress_class: nginx-external
+monitoring_grafana_cluster_issuer: letsencrypt-prod
+
+# ── Alertmanager / Telegram ───────────────────────────────────────────────────
+monitoring_telegram_bot_token: "{{ vault_telegram_bot_token }}"
+monitoring_telegram_chat_id: "{{ vault_telegram_chat_id }}"
+
+# ── Prometheus ────────────────────────────────────────────────────────────────
+monitoring_prometheus_retention: "15d"
+monitoring_prometheus_storage_size: "10Gi"
+monitoring_prometheus_memory_limit: "512Mi"

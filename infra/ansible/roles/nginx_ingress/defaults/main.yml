@@ -1,0 +1,22 @@
+---
+# ── nginx-ingress Helm chart ──────────────────────────────────────────────────
+nginx_ingress_namespace: ingress-nginx
+nginx_ingress_chart_version: "4.10.1"
+
+nginx_ingress_requests_cpu: "100m"
+nginx_ingress_requests_memory: "128Mi"
+nginx_ingress_limits_cpu: "500m"
+nginx_ingress_limits_memory: "256Mi"
+
+# ── Internal controller (VPN/private) ────────────────────────────────────────
+nginx_ingress_internal_enabled: true
+nginx_ingress_internal_class: nginx-internal
+nginx_ingress_lb_subnet_id: ""  # required — set in group_vars
+
+# ── External controller (public internet) ────────────────────────────────────
+nginx_ingress_external_enabled: false
+nginx_ingress_external_class: nginx-external
+
+# ── Static IPs (optional — leave empty to let YC assign automatically) ───────
+nginx_ingress_internal_lb_ip: ""  # e.g. "10.10.2.12"
+nginx_ingress_external_lb_ip: ""  # set after reserving via Terraform

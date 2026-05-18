@@ -1,0 +1,106 @@
+---
+# ── nginx-ingress via Helm ────────────────────────────────────────────────────
+
+- name: Add ingress-nginx Helm repository
+  kubernetes.core.helm_repository:
+    name: ingress-nginx
+    repo_url: https://kubernetes.github.io/ingress-nginx
+  become: false
+
+- name: Create ingress-nginx namespace
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ nginx_ingress_namespace }}"
+    state: present
+  become: false
+
+# ── Internal controller ───────────────────────────────────────────────────────
+
+- name: Template nginx-ingress internal values
+  ansible.builtin.template:
+    src: values-internal.yaml.j2
+    dest: /tmp/nginx-ingress-internal-values.yaml
+    mode: "0600"
+  become: false
+  when: nginx_ingress_internal_enabled
+
+- name: Install / upgrade nginx-ingress (internal)
+  kubernetes.core.helm:
+    name: ingress-nginx-internal
+    chart_ref: ingress-nginx/ingress-nginx
+    chart_version: "{{ nginx_ingress_chart_version }}"
+    release_namespace: "{{ nginx_ingress_namespace }}"
+    create_namespace: true
+    wait: true
+    values_files:
+      - /tmp/nginx-ingress-internal-values.yaml
+  become: false
+  when: nginx_ingress_internal_enabled
+
+- name: Wait for internal LB IP
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Service
+    name: ingress-nginx-internal-controller
+    namespace: "{{ nginx_ingress_namespace }}"
+  register: _internal_svc
+  until: >-
+    _internal_svc.resources | length > 0 and
+    (_internal_svc.resources[0].status.loadBalancer.ingress | default([]) | length) > 0
+  retries: 30
+  delay: 10
+  become: false
+  when: nginx_ingress_internal_enabled
+
+- name: Show internal LB IP
+  ansible.builtin.debug:
+    msg: >-
+      [internal] nginx LB IP: {{ _internal_svc.resources[0].status.loadBalancer.ingress[0].ip }}
+      — добавь на раннер: echo "{{ _internal_svc.resources[0].status.loadBalancer.ingress[0].ip }} vault.internal temporal.internal" >> /etc/hosts
+  when: nginx_ingress_internal_enabled
+
+# ── External controller ───────────────────────────────────────────────────────
+
+- name: Template nginx-ingress external values
+  ansible.builtin.template:
+    src: values-external.yaml.j2
+    dest: /tmp/nginx-ingress-external-values.yaml
+    mode: "0600"
+  become: false
+  when: nginx_ingress_external_enabled
+
+- name: Install / upgrade nginx-ingress (external)
+  kubernetes.core.helm:
+    name: ingress-nginx-external
+    chart_ref: ingress-nginx/ingress-nginx
+    chart_version: "{{ nginx_ingress_chart_version }}"
+    release_namespace: "{{ nginx_ingress_namespace }}"
+    create_namespace: true
+    wait: true
+    values_files:
+      - /tmp/nginx-ingress-external-values.yaml
+  become: false
+  when: nginx_ingress_external_enabled
+
+- name: Wait for external LB IP
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Service
+    name: ingress-nginx-external-controller
+    namespace: "{{ nginx_ingress_namespace }}"
+  register: _external_svc
+  until: >-
+    _external_svc.resources | length > 0 and
+    (_external_svc.resources[0].status.loadBalancer.ingress | default([]) | length) > 0
+  retries: 30
+  delay: 10
+  become: false
+  when: nginx_ingress_external_enabled
+
+- name: Show external LB IP
+  ansible.builtin.debug:
+    msg: >-
+      [external] nginx LB IP: {{ _external_svc.resources[0].status.loadBalancer.ingress[0].ip }}
+      — направь DNS-записи на этот IP
+  when: nginx_ingress_external_enabled

@@ -1,0 +1,59 @@
+# Mailcow configuration – managed by Ansible, do not edit manually
+# Generated for: {{ mailcow_hostname }}
+
+MAILCOW_HOSTNAME={{ mailcow_hostname }}
+MAILCOW_PASS_SCHEME=BLF-CRYPT
+
+# ── Database ──────────────────────────────────────────────────────────────────
+DBNAME=mailcow
+DBUSER=mailcow
+DBPASS={{ mailcow_dbpass }}
+DBROOT={{ mailcow_dbroot }}
+
+# ── Redis ─────────────────────────────────────────────────────────────────────
+REDISPASS={{ mailcow_redispass }}
+
+# ── HTTP/S Binding ────────────────────────────────────────────────────────────
+HTTP_PORT={{ mailcow_http_port }}
+HTTP_BIND=
+HTTPS_PORT={{ mailcow_https_port }}
+HTTPS_BIND=
+
+# ── Mail Port Bindings ────────────────────────────────────────────────────────
+SMTP_PORT={{ mailcow_smtp_port }}
+SMTPS_PORT={{ mailcow_smtps_port }}
+SUBMISSION_PORT={{ mailcow_submission_port }}
+IMAP_PORT={{ mailcow_imap_port }}
+IMAPS_PORT={{ mailcow_imaps_port }}
+POP_PORT=110
+POPS_PORT={{ mailcow_pop3s_port }}
+SIEVE_PORT={{ mailcow_sieve_port }}
+
+# ── Timezone ──────────────────────────────────────────────────────────────────
+TZ={{ mailcow_timezone }}
+
+# ── Let's Encrypt ─────────────────────────────────────────────────────────────
+SKIP_LETS_ENCRYPT={{ mailcow_skip_lets_encrypt }}
+ENABLE_SSL_SNI=n
+SKIP_IP_CHECK=n
+SKIP_HTTP_VERIFICATION=n
+
+# ── Optional Features ─────────────────────────────────────────────────────────
+SKIP_CLAMD={{ mailcow_skip_clamd }}
+SKIP_SOLR={{ mailcow_skip_solr }}
+SOLR_HEAP=1024
+SKIP_SOGO={{ mailcow_skip_sogo }}
+SOGO_WORKER_COUNT=4
+
+# ── Watchdog ──────────────────────────────────────────────────────────────────
+USE_WATCHDOG=y
+WATCHDOG_NOTIFY_EMAIL={{ mailcow_watchdog_notify_email }}
+WATCHDOG_NOTIFY_BAN_TRESHOLD=1
+WATCHDOG_SUBJECT=Watchdog ALERT
+WATCHDOG_EXTERNAL_CHECKS=n
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+MAILDIR_GC_TIME=7200
+ALLOW_ADMIN_EMAIL_LOGIN=n
+COMPOSE_PROJECT_NAME=mailcowdockerized
+DOCKER_COMPOSE_VERSION=native

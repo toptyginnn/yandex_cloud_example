@@ -1,0 +1,30 @@
+---
+# ── Temporal Helm chart ───────────────────────────────────────────────────────
+temporal_namespace: temporal
+temporal_release_name: temporal
+temporal_chart_version: "0.73.2"  # temporalio/temporal
+
+temporal_server_replica_count: 1
+temporal_web_enabled: true
+temporal_admintools_enabled: true
+
+# ── Namespaces to register after deploy ───────────────────────────────────────
+temporal_namespaces:
+  - name: default
+    retention: 3
+
+# ── Embedded PostgreSQL (stage) ───────────────────────────────────────────────
+temporal_use_embedded_postgresql: true
+
+# ── External PostgreSQL (prod — set in host_vars/group_vars) ─────────────────
+temporal_external_pg_host: ""
+temporal_external_pg_port: "6432"
+temporal_external_pg_user: temporal
+temporal_external_pg_password: "{{ vault_temporal_pg_password | default('CHANGE_ME') }}"
+
+temporal_external_pg_database: temporal
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
+temporal_ingress_hostname: temporal.internal
+temporal_ingress_class: nginx-internal
+temporal_cluster_issuer: internal-ca  # cert-manager ClusterIssuer name

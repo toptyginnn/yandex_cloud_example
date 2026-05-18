@@ -1,0 +1,5 @@
+gitlab_runner_name: prod-runner
+gitlab_runner_tags:
+  - prod
+  - docker
+gitlab_runner_token: "{{ vault_gitlab_runner_token | default('CHANGE_ME_PROD_RUNNER_TOKEN') }}"

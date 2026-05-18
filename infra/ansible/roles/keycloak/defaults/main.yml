@@ -1,0 +1,29 @@
+---
+# ── Keycloak Helm chart (codecentric/keycloakx) ───────────────────────────────
+keycloak_namespace: keycloak
+keycloak_release_name: keycloak
+keycloak_chart_version: "7.1.10"   # codecentric/keycloakx — check: helm search repo codecentric/keycloakx
+
+# ── Admin credentials ─────────────────────────────────────────────────────────
+keycloak_admin_user: admin
+keycloak_admin_password: "{{ vault_keycloak_admin_password | default('CHANGE_ME') }}"
+
+# ── External PostgreSQL ───────────────────────────────────────────────────────
+keycloak_pg_host: ""
+keycloak_pg_port: "5432"
+keycloak_pg_user: keycloak
+keycloak_pg_password: "{{ vault_keycloak_pg_password | default('CHANGE_ME') }}"
+keycloak_pg_database: keycloak
+
+# ── Resources ─────────────────────────────────────────────────────────────────
+keycloak_replica_count: 1
+
+keycloak_resources_requests_cpu: "500m"
+keycloak_resources_requests_memory: "512Mi"
+keycloak_resources_limits_cpu: "2000m"
+keycloak_resources_limits_memory: "1Gi"
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
+keycloak_ingress_hostname: keycloak.example.com
+keycloak_ingress_class: nginx-external
+keycloak_cluster_issuer: letsencrypt-prod

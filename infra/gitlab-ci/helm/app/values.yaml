@@ -1,0 +1,99 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Generic app chart — default values.
+# Override in values-<component>-<env>.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+
+image:
+  repository: cr.yandex/REGISTRY_ID/app
+  tag: latest
+  pullPolicy: Always
+
+# Container port the app listens on
+port: 8000
+
+# ── Secrets ───────────────────────────────────────────────────────────────────
+# Name of K8s Secret created by CI from Vaultwarden.
+# All keys become env vars via envFrom.secretRef.
+# Set to "" to skip (e.g. frontend with no runtime secrets).
+secretName: ""
+
+# ── Non-sensitive env vars ────────────────────────────────────────────────────
+# Committed to git — no passwords here.
+env: {}
+# Example:
+#   SERVICE_PORT: "8000"
+#   NUM_WORKERS: "2"
+
+# ── Frontend runtime config ───────────────────────────────────────────────────
+# When non-empty, an initContainer is added that renders these values into
+# /usr/share/nginx/html/env-config.js as window.__ENV__ = { ... }
+# so the SPA can read them at runtime without a rebuild.
+runtimeEnv: {}
+# Example:
+#   VITE_API_URL: https://api.bt6.internal
+#   VITE_APP_ENV: production
+
+# ── Service ───────────────────────────────────────────────────────────────────
+service:
+  type: ClusterIP
+  port: 80
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  host: app.bt6.internal
+  tls: false
+
+# ── Scaling ───────────────────────────────────────────────────────────────────
+replicaCount: 1
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# ── Resources ─────────────────────────────────────────────────────────────────
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# ── Probes ────────────────────────────────────────────────────────────────────
+probes:
+  startup:
+    path: /health
+    failureThreshold: 20   # 20 × 10s = 200s max startup time
+    periodSeconds: 10
+  liveness:
+    path: /health
+    periodSeconds: 15
+    failureThreshold: 3
+  readiness:
+    path: /health
+    periodSeconds: 10
+    failureThreshold: 3
+
+# ── Loki / observability labels ──────────────────────────────────────────────
+# Promtail automatically picks up pod labels as Loki stream labels.
+# appName groups related services (e.g. "cards" for cards-backend + cards-frontend).
+# Defaults to Release.Name if not set.
+appName: ""       # e.g. "cards", "app", "landing"
+component: ""     # e.g. "backend", "frontend"
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+terminationGracePeriodSeconds: 60
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

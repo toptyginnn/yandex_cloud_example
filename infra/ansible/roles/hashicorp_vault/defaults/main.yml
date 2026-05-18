@@ -1,0 +1,35 @@
+---
+# ── HashiCorp Vault Helm chart (Yandex Cloud Marketplace build) ───────────────
+hashicorp_vault_namespace: vault
+hashicorp_vault_release_name: vault
+hashicorp_vault_chart_version: "0.30.0-3-yckms"   # oci://cr.yandex/yc-marketplace/yandex-cloud/vault/chart/vault
+
+# ── Yandex KMS auto-unseal ────────────────────────────────────────────────────
+# Заполнить из terraform outputs:
+#   vault_kms_key_id        → tofu output -raw vault_kms_key_id
+#   vault_hashicorp_vault_kms_auth_json → tofu output -raw vault_sa_authorized_key
+#                             (сохранить в inventories/group_vars/k8s_apps_*/vault.yml)
+hashicorp_vault_kms_key_id: ""
+hashicorp_vault_kms_auth_json: "{{ vault_hashicorp_vault_kms_auth_json }}"
+
+hashicorp_vault_replicas: 1
+hashicorp_vault_ha_enabled: false
+
+# Raft integrated storage
+hashicorp_vault_storage_size: "10Gi"
+hashicorp_vault_storage_class: yc-network-ssd
+
+# Ingress (UI)
+hashicorp_vault_ingress_enabled: true
+hashicorp_vault_ingress_hostname: hcvault.internal
+hashicorp_vault_ingress_class: nginx-internal
+hashicorp_vault_cluster_issuer: internal-ca
+
+# Agent injector (для автоматической инъекции секретов в поды)
+hashicorp_vault_injector_enabled: false
+
+# Resources
+hashicorp_vault_resources_requests_cpu: "250m"
+hashicorp_vault_resources_requests_memory: "256Mi"
+hashicorp_vault_resources_limits_cpu: "500m"
+hashicorp_vault_resources_limits_memory: "512Mi"

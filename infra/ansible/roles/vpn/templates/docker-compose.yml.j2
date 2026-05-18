@@ -1,0 +1,126 @@
+services:
+  # ── CockroachDB (database for Zitadel) ──────────────────────────────────────
+  crdb:
+    image: cockroachdb/cockroach:{{ netbird_crdb_tag }}
+    container_name: crdb
+    restart: unless-stopped
+    command: start-single-node --insecure --http-addr=crdb:8080
+    healthcheck:
+      test: ["CMD", "cockroach", "sql", "--insecure", "-e", "SELECT 1"]
+      interval: 10s
+      timeout: 30s
+      retries: 5
+      start_period: 20s
+    volumes:
+      - crdb_data:/cockroach/cockroach-data
+
+  # ── Zitadel (Identity Provider) ─────────────────────────────────────────────
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:{{ netbird_zitadel_tag }}
+    container_name: zitadel
+    restart: unless-stopped
+    command: start-from-init --masterkeyFromEnv --tlsMode external
+    environment:
+      ZITADEL_DATABASE_POSTGRES_HOST: crdb
+      ZITADEL_DATABASE_POSTGRES_PORT: "26257"
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: root
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: root
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      ZITADEL_EXTERNALSECURE: "true"
+      ZITADEL_EXTERNALPORT: "443"
+      ZITADEL_EXTERNALDOMAIN: "{{ netbird_domain }}"
+      ZITADEL_MASTERKEY: "{{ netbird_zitadel_masterkey }}"
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: "{{ netbird_zitadel_admin_username }}"
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: "{{ netbird_zitadel_admin_password }}"
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
+    depends_on:
+      crdb:
+        condition: service_healthy
+    volumes:
+      - zitadel_data:/var/lib/zitadel
+
+  # ── Netbird Management ───────────────────────────────────────────────────────
+  management:
+    image: netbirdio/management:{{ netbird_management_tag }}
+    container_name: management
+    restart: unless-stopped
+    depends_on:
+      - coturn
+      - zitadel
+    extra_hosts:
+      - "{{ netbird_domain }}:host-gateway"
+    volumes:
+      - management_data:/var/lib/netbird
+      - ./management.json:/etc/netbird/management.json:ro
+    command:
+      - --port=10443
+      - --log-file=console
+      - --log-level=info
+      - --disable-anonymous-metrics=false
+      - --single-account-mode-domain={{ netbird_domain }}
+      - --dns-domain={{ netbird_domain }}
+
+  # ── Netbird Signal ───────────────────────────────────────────────────────────
+  signal:
+    image: netbirdio/signal:{{ netbird_signal_tag }}
+    container_name: signal
+    restart: unless-stopped
+    volumes:
+      - signal_data:/var/lib/netbird
+    command:
+      - --port=10000
+      - --log-file=console
+      - --log-level=info
+
+  # ── Coturn (TURN/STUN relay) ─────────────────────────────────────────────────
+  coturn:
+    image: coturn/coturn:{{ netbird_coturn_tag }}
+    container_name: coturn
+    restart: unless-stopped
+    domainname: "{{ netbird_domain }}"
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
+    network_mode: host
+
+  # ── Netbird Dashboard ────────────────────────────────────────────────────────
+  dashboard:
+    image: netbirdio/dashboard:{{ netbird_dashboard_tag }}
+    container_name: dashboard
+    restart: unless-stopped
+    environment:
+      AUTH_AUTHORITY: "https://{{ netbird_domain }}"
+      NETBIRD_MGMT_API_ENDPOINT: "https://{{ netbird_domain }}"
+      NETBIRD_MGMT_GRPC_API_ENDPOINT: "https://{{ netbird_domain }}"
+      AUTH_CLIENT_ID: "{{ netbird_pkce_client_id }}"
+      AUTH_AUDIENCE: "{{ netbird_auth_client_id }}"
+      AUTH_SUPPORTED_SCOPES: "openid profile email offline_access"
+      AUTH_USE_PKCE: "true"
+      USE_AUTH0: "false"
+
+  # ── Caddy (reverse proxy + TLS) ──────────────────────────────────────────────
+  caddy:
+    image: {{ netbird_caddy_image }}
+    container_name: caddy
+    restart: unless-stopped
+    depends_on:
+      - dashboard
+      - management
+      - signal
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  crdb_data:
+  zitadel_data:
+  management_data:
+  signal_data:
+  caddy_data:
+  caddy_config:

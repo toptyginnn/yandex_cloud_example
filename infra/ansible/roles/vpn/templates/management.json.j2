@@ -1,0 +1,76 @@
+{
+  "DataStoreEncryptionKey": "{{ netbird_datastore_key }}",
+  "Stuns": [
+    {
+      "Proto": "udp",
+      "URI": "stun:{{ netbird_domain }}:3478",
+      "Username": "",
+      "Password": null
+    }
+  ],
+  "TURNConfig": {
+    "Timeouts": {
+      "IdpUserDeleteLockTimeout": 60
+    },
+    "Turns": [
+      {
+        "Proto": "udp",
+        "URI": "turn:{{ netbird_domain }}:3478",
+        "Username": "self",
+        "Password": null
+      }
+    ],
+    "CredentialsTTL": "12h",
+    "Secret": "{{ netbird_turn_secret }}"
+  },
+  "Signal": {
+    "Proto": "https",
+    "URI": "{{ netbird_domain }}:443",
+    "Username": "",
+    "Password": null
+  },
+  "Datadir": "/var/lib/netbird/",
+  "HttpConfig": {
+    "LetsEncryptDomain": "",
+    "CertFile": "",
+    "CertKey": "",
+    "AuthAudience": "{{ netbird_auth_client_id }}",
+    "AuthKeysLocation": "{% if netbird_auth_client_id | default('') | length > 0 %}https://{{ netbird_domain }}/oauth/v2/keys{% endif %}",
+    "AuthIssuer": "{% if netbird_auth_client_id | default('') | length > 0 %}https://{{ netbird_domain }}{% endif %}",
+    "IdpSignKeyRefreshEnabled": true,
+    "OAuthIntegration": {% if netbird_device_client_id | default('') | length > 0 %}{
+      "ClientSecret": "{{ netbird_device_client_secret }}",
+      "ClientID": "{{ netbird_device_client_id }}",
+      "TokenEndpoint": "https://{{ netbird_domain }}/oauth/v2/token",
+      "RequestedScopes": ["openid", "profile", "email"],
+      "Audience": "{{ netbird_auth_client_id }}"
+    }{% else %}null{% endif %}
+  },
+  "IdpManagerConfig": {% if netbird_sa_client_id | default('') | length > 0 %}{
+    "ManagerType": "zitadel",
+    "ClientConfig": {
+      "Issuer": "https://{{ netbird_domain }}",
+      "ClientID": "{{ netbird_sa_client_id }}",
+      "ClientSecret": "{{ netbird_sa_client_secret }}",
+      "GrantType": "client_credentials",
+      "TokenEndpoint": "https://{{ netbird_domain }}/oauth/v2/token"
+    },
+    "ExtraConfig": {
+      "ManagementEndpoint": "https://{{ netbird_domain }}/management/v1"
+    },
+    "Auth0ClientCredentials": null
+  }{% else %}null{% endif %},
+  "DeviceAuthorizationFlow": null,
+  "PKCEAuthorizationFlow": {% if netbird_pkce_client_id | default('') | length > 0 %}{
+    "ProviderConfig": {
+      "Audience": "{{ netbird_auth_client_id }}",
+      "ClientID": "{{ netbird_pkce_client_id }}",
+      "ClientSecret": "",
+      "Domain": "{{ netbird_domain }}",
+      "AuthorizationEndpoint": "https://{{ netbird_domain }}/oauth/v2/authorize",
+      "TokenEndpoint": "https://{{ netbird_domain }}/oauth/v2/token",
+      "Scope": "openid profile email offline_access",
+      "RedirectURLs": ["http://localhost:53000", "http://localhost:54545"]
+    }
+  }{% else %}null{% endif %}
+}

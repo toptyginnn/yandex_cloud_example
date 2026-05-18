@@ -1,0 +1,25 @@
+---
+# ── Grafana Loki – Helm chart ─────────────────────────────────────────────────
+# Verify latest versions:
+#   helm search repo grafana/loki --versions | head -5
+#   helm search repo grafana/promtail --versions | head -5
+loki_namespace: monitoring
+loki_release_name: loki
+loki_chart_version: "6.55.0"
+
+loki_promtail_release_name: promtail
+# Verify: helm search repo grafana/promtail --versions | head -3
+loki_promtail_chart_version: "6.17.1"
+
+# ── Stage: filesystem storage ─────────────────────────────────────────────────
+loki_storage_size: "15Gi"
+loki_storage_class: "yc-network-hdd"
+loki_retention_period: "168h"   # 7 days
+
+# ── Prod: S3 storage (filled from Terraform outputs) ─────────────────────────
+# loki_s3_bucket_name — from tofu output -raw loki_s3_bucket_name
+# loki_s3_access_key  — from tofu output -raw loki_s3_access_key  (store in Ansible Vault)
+# loki_s3_secret_key  — from tofu output -raw loki_s3_secret_key  (store in Ansible Vault)
+loki_wal_storage_size: "10Gi"
+loki_wal_storage_class: "yc-network-ssd"
+loki_prod_retention_period: "720h"  # 30 days

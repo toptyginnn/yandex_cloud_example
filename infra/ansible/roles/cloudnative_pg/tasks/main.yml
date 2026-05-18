@@ -1,0 +1,172 @@
+---
+# ── CloudNativePG operator via Helm ──────────────────────────────────────────
+
+- name: Add CloudNativePG Helm repository
+  kubernetes.core.helm_repository:
+    name: cnpg
+    repo_url: https://cloudnative-pg.github.io/charts
+  become: false
+
+- name: Install CloudNativePG operator
+  kubernetes.core.helm:
+    name: "{{ cnpg_operator_release_name }}"
+    chart_ref: cnpg/cloudnative-pg
+    chart_version: "{{ cnpg_operator_chart_version }}"
+    release_namespace: "{{ cnpg_operator_namespace }}"
+    create_namespace: true
+    wait: true
+    values_files:
+      - "{{ role_path }}/files/operator-values.yaml"
+  become: false
+
+# ── Namespace for databases ───────────────────────────────────────────────────
+
+- name: Create databases namespace
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ cnpg_namespace }}"
+    state: present
+  become: false
+
+# ── Superuser secret ──────────────────────────────────────────────────────────
+
+- name: Create PostgreSQL superuser secret
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ cnpg_cluster_name }}-superuser"
+        namespace: "{{ cnpg_namespace }}"
+      type: kubernetes.io/basic-auth
+      stringData:
+        username: "{{ cnpg_pg_user }}"
+        password: "{{ cnpg_pg_password }}"
+  become: false
+
+# ── CloudNativePG Cluster CR ──────────────────────────────────────────────────
+
+- name: Create CloudNativePG Cluster
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
+      metadata:
+        name: "{{ cnpg_cluster_name }}"
+        namespace: "{{ cnpg_namespace }}"
+      spec:
+        instances: "{{ cnpg_instances }}"
+        imageName: "ghcr.io/cloudnative-pg/postgresql:{{ cnpg_pg_version }}"
+        primaryUpdateStrategy: unsupervised
+        bootstrap:
+          initdb:
+            database: "{{ cnpg_pg_database }}"
+            owner: "{{ cnpg_pg_user }}"
+            secret:
+              name: "{{ cnpg_cluster_name }}-superuser"
+        storage:
+          size: "{{ cnpg_pvc_size }}"
+          storageClass: "{{ cnpg_storage_class }}"
+        resources:
+          requests:
+            cpu: "{{ cnpg_resources_requests_cpu }}"
+            memory: "{{ cnpg_resources_requests_memory }}"
+          limits:
+            cpu: "{{ cnpg_resources_limits_cpu }}"
+            memory: "{{ cnpg_resources_limits_memory }}"
+        postgresql:
+          parameters:
+            max_connections: "{{ cnpg_max_connections }}"
+            shared_buffers: "{{ cnpg_shared_buffers }}"
+  become: false
+
+# ── Developer access: internal LoadBalancer for PostgreSQL ────────────────────
+
+- name: Build developer LB annotations
+  ansible.builtin.set_fact:
+    _cnpg_dev_lb_annotations: >-
+      {{
+        {
+          'yandex.cloud/load-balancer-type': 'internal',
+          'yandex.cloud/subnet-id': cnpg_dev_lb_subnet_id
+        } | combine(
+          {'yandex.cloud/load-balancer-address': cnpg_dev_lb_ip}
+          if cnpg_dev_lb_ip else {}
+        )
+      }}
+  when: cnpg_dev_lb_enabled
+
+- name: Create internal LoadBalancer Service for developer DB access
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: "{{ cnpg_cluster_name }}-dev-lb"
+        namespace: "{{ cnpg_namespace }}"
+        annotations: "{{ _cnpg_dev_lb_annotations }}"
+      spec:
+        type: LoadBalancer
+        selector:
+          cnpg.io/cluster: "{{ cnpg_cluster_name }}"
+          role: primary
+        ports:
+          - port: 5432
+            targetPort: 5432
+            protocol: TCP
+  become: false
+  when: cnpg_dev_lb_enabled
+
+- name: Remove developer LoadBalancer Service if disabled
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: Service
+    name: "{{ cnpg_cluster_name }}-dev-lb"
+    namespace: "{{ cnpg_namespace }}"
+  become: false
+  when: not cnpg_dev_lb_enabled
+
+- name: Wait for developer LB IP
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Service
+    name: "{{ cnpg_cluster_name }}-dev-lb"
+    namespace: "{{ cnpg_namespace }}"
+  register: _dev_lb_svc
+  until: >-
+    _dev_lb_svc.resources | length > 0 and
+    (_dev_lb_svc.resources[0].status.loadBalancer.ingress | default([]) | length) > 0
+  retries: 30
+  delay: 10
+  become: false
+  when: cnpg_dev_lb_enabled
+
+- name: Show developer LB connection info
+  ansible.builtin.debug:
+    msg: >-
+      [dev-lb] PostgreSQL доступен по адресу:
+      host={{ _dev_lb_svc.resources[0].status.loadBalancer.ingress[0].ip }}
+      port=5432
+      — подключение только через VPN
+  when: cnpg_dev_lb_enabled
+
+# ── Wait for CloudNativePG Cluster to be ready ────────────────────────────────
+
+- name: Wait for CloudNativePG Cluster to be ready
+  kubernetes.core.k8s_info:
+    api_version: postgresql.cnpg.io/v1
+    kind: Cluster
+    name: "{{ cnpg_cluster_name }}"
+    namespace: "{{ cnpg_namespace }}"
+  register: cnpg_cluster_info
+  until: >
+    cnpg_cluster_info.resources | length > 0 and
+    (cnpg_cluster_info.resources[0].status.readyInstances | default(0)) == cnpg_instances
+  retries: 30
+  delay: 10
+  become: false

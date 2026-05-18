@@ -1,0 +1,42 @@
+appName: app
+component: frontend
+
+image:
+  repository: cr.yandex/REGISTRY_ID/app-frontend
+
+port: 3000
+secretName: ""
+
+env:
+  PORT: "3000"
+
+ingress:
+  enabled: true
+  className: nginx-external
+  host: app.stage.myapp.example.com
+  tls: true
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+replicaCount: 1
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+probes:
+  startup:
+    path: /health
+    failureThreshold: 10
+    periodSeconds: 5
+  liveness:
+    path: /health
+    periodSeconds: 15
+    failureThreshold: 3
+  readiness:
+    path: /health
+    periodSeconds: 10
+    failureThreshold: 3

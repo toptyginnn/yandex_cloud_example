@@ -1,0 +1,17 @@
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# GitLab Runner – Prod
+#
+# Prerequisites:
+#   1. tofu apply ENV=prod (creates prod runner VM)
+#   2. Set gitlab_runner_token in inventories/host_vars/prod-runner.yml
+#
+# Run:
+#   ansible-playbook playbooks/gitlab-runner-prod.yml
+# ──────────────────────────────────────────────────────────────────────────────
+- name: Configure GitLab runner (prod)
+  hosts: prod-runner
+  become: true
+  roles:
+    - docker_host
+    - gitlab_runner

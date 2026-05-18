@@ -1,0 +1,16 @@
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# Установка node_exporter на все VM-инстансы
+#
+# Run:
+#   ansible-playbook playbooks/node-exporter.yml
+#   ansible-playbook playbooks/node-exporter.yml --limit gw
+#   ansible-playbook playbooks/node-exporter.yml --limit mailcow,gitlab
+# ──────────────────────────────────────────────────────────────────────────────
+- name: Install node_exporter on VM nodes
+  hosts: vm_nodes
+  gather_facts: false
+
+  roles:
+    - role: node_exporter
+      tags: [node_exporter]

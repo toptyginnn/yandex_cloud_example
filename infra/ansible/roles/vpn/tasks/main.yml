@@ -1,0 +1,54 @@
+---
+- name: Create Netbird project directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /opt/netbird
+
+- name: Enable IP forwarding on host
+  ansible.builtin.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    sysctl_set: true
+
+- name: Render management.json
+  ansible.builtin.template:
+    src: management.json.j2
+    dest: /opt/netbird/management.json
+    mode: "0600"
+  notify: Restart management
+
+- name: Render turnserver.conf
+  ansible.builtin.template:
+    src: turnserver.conf.j2
+    dest: /opt/netbird/turnserver.conf
+    mode: "0644"
+  notify: Restart coturn
+
+- name: Render Netbird docker-compose stack
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /opt/netbird/docker-compose.yml
+    mode: "0644"
+  notify: Restart Netbird stack
+
+- name: Render Caddyfile for Netbird
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: /opt/netbird/Caddyfile
+    mode: "0644"
+  notify: Restart caddy
+
+- name: Start Netbird stack
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: /opt/netbird
+  register: netbird_compose_up
+  changed_when: >
+    'Container' in netbird_compose_up.stdout or
+    'Creating' in netbird_compose_up.stdout or
+    'Starting' in netbird_compose_up.stdout or
+    'Recreating' in netbird_compose_up.stdout

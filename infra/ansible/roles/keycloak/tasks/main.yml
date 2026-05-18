@@ -1,0 +1,52 @@
+---
+# ── Keycloak via Helm (codecentric/keycloakx) ─────────────────────────────────
+
+- name: Add Codecentric Helm repository
+  kubernetes.core.helm_repository:
+    name: codecentric
+    repo_url: https://codecentric.github.io/helm-charts
+  become: false
+
+- name: Create Keycloak namespace
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ keycloak_namespace }}"
+    state: present
+  become: false
+
+- name: Template Keycloak values
+  ansible.builtin.template:
+    src: "values-{{ env_name }}.yaml.j2"
+    dest: /tmp/keycloak-values.yaml
+    mode: "0600"
+  become: false
+
+- name: Install / upgrade Keycloak
+  kubernetes.core.helm:
+    name: "{{ keycloak_release_name }}"
+    chart_ref: codecentric/keycloakx
+    chart_version: "{{ keycloak_chart_version }}"
+    release_namespace: "{{ keycloak_namespace }}"
+    create_namespace: true
+    wait: true
+    wait_timeout: 600s
+    values_files:
+      - /tmp/keycloak-values.yaml
+  become: false
+
+
+- name: Wait for Keycloak to be ready
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ keycloak_namespace }}"
+    label_selectors:
+      - "app.kubernetes.io/name=keycloakx"
+    field_selectors:
+      - "status.phase=Running"
+  register: _keycloak_pods
+  until: _keycloak_pods.resources | length >= keycloak_replica_count
+  retries: 30
+  delay: 10
+  become: false

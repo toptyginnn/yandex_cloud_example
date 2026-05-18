@@ -1,0 +1,15 @@
+---
+# ── cert-manager Helm chart ───────────────────────────────────────────────────
+cert_manager_namespace: cert-manager
+cert_manager_chart_version: "v1.14.5"
+
+# ── ClusterIssuer names ───────────────────────────────────────────────────────
+cert_manager_selfsigned_issuer_name: selfsigned-bootstrap
+cert_manager_ca_issuer_name: internal-ca
+cert_manager_ca_secret_name: internal-root-ca
+cert_manager_letsencrypt_staging_issuer_name: letsencrypt-staging
+cert_manager_letsencrypt_prod_issuer_name: letsencrypt-prod
+
+# ── Let's Encrypt ─────────────────────────────────────────────────────────────
+cert_manager_letsencrypt_email: ""  # set in group_vars
+cert_manager_acme_ingress_class: nginx-external  # IngressClass for HTTP-01 solver

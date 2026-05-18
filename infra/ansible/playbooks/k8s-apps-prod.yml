@@ -1,0 +1,49 @@
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# K8s Applications – Prod
+#
+# Prerequisites:
+#   1. tofu apply ENV=prod  (creates K8s cluster)
+#   2. make kubeconfig ENV=prod  (or: yc managed-kubernetes cluster get-credentials --id <id> --internal)
+#
+# Run:
+#   ansible-playbook playbooks/k8s-apps-prod.yml
+#   ansible-playbook playbooks/k8s-apps-prod.yml --tags temporal
+# ──────────────────────────────────────────────────────────────────────────────
+- name: Deploy K8s applications to prod
+  hosts: k8s_apps_prod
+  gather_facts: false
+
+  vars:
+    env_name: prod
+
+  roles:
+    - role: nginx_ingress
+      tags: [nginx_ingress, ingress]
+
+    - role: cert_manager
+      tags: [cert_manager]
+
+    - role: cloudnative_pg
+      tags: [cloudnative_pg, databases]
+
+    - role: cnpg_databases
+      tags: [cnpg_databases, databases]
+
+    - role: redis_k8s
+      tags: [redis_k8s, databases]
+
+    - role: temporal
+      tags: [temporal]
+
+    - role: vaultwarden
+      tags: [vaultwarden]
+
+    - role: keycloak
+      tags: [keycloak]
+
+    - role: monitoring
+      tags: [monitoring]
+
+    - role: loki
+      tags: [loki, monitoring]

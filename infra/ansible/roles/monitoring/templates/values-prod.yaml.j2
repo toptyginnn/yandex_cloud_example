@@ -1,0 +1,184 @@
+# kube-prometheus-stack — prod values
+# Chart: prometheus-community/kube-prometheus-stack
+
+grafana:
+  adminPassword: {{ monitoring_grafana_admin_password }}
+
+  deploymentStrategy:
+    type: Recreate
+
+  grafana.ini:
+    users:
+      allow_sign_up: false
+      auto_assign_org: true
+      auto_assign_org_role: Viewer
+    auth:
+      disable_login_form: false
+
+  ingress:
+    enabled: true
+    ingressClassName: {{ monitoring_grafana_ingress_class }}
+    hosts:
+      - {{ monitoring_grafana_ingress_hostname }}
+    tls:
+      - secretName: grafana-tls
+        hosts:
+          - {{ monitoring_grafana_ingress_hostname }}
+    annotations:
+      cert-manager.io/cluster-issuer: "{{ monitoring_grafana_cluster_issuer }}"
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClassName: yc-network-ssd
+
+  sidecar:
+    dashboards:
+      enabled: true
+    datasources:
+      enabled: true
+
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: http://loki.{{ monitoring_namespace }}.svc.cluster.local:3100
+      access: proxy
+      isDefault: false
+      jsonData:
+        maxLines: 5000
+        timeout: 60
+
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: loki-dashboards
+          orgId: 1
+          folder: Logs
+          type: file
+          disableDeletion: true
+          editable: false
+          options:
+            path: /var/lib/grafana/dashboards/loki-dashboards
+
+  dashboards:
+    loki-dashboards:
+      loki-quick-search:
+        gnetId: 13639
+        revision: 1
+        datasource: Loki
+      k8s-logs-namespaces:
+        gnetId: 15141
+        revision: 1
+        datasource: Loki
+      k8s-logs-pod:
+        gnetId: 15142
+        revision: 1
+        datasource: Loki
+
+prometheus:
+  prometheusSpec:
+    retention: {{ monitoring_prometheus_retention }}
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+
+    replicas: 1
+
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: {{ monitoring_prometheus_memory_limit }}
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: yc-network-ssd
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: {{ monitoring_prometheus_storage_size }}
+
+    # Scrape ServiceMonitors from all namespaces
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+kube-state-metrics:
+  collectors:
+    - cronjobs
+    - daemonsets
+    - deployments
+    - horizontalpodautoscalers
+    - ingresses
+    - jobs
+    - namespaces
+    - nodes
+    - persistentvolumeclaims
+    - persistentvolumes
+    - poddisruptionbudgets
+    - pods
+    - replicasets
+    - replicationcontrollers
+    - services
+    - statefulsets
+    - storageclasses
+
+  prometheus:
+    monitor:
+      scrapeTimeout: 30s
+
+  livenessProbe:
+    httpGet:
+      path: /livez
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 30
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: 8081
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    timeoutSeconds: 30
+    failureThreshold: 3
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 300m
+      memory: 128Mi

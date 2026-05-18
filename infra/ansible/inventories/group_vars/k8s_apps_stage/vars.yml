@@ -1,0 +1,146 @@
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# K8s Apps – Stage environment variables
+# Sensitive values should be set via environment variables or Ansible Vault:
+#   ANSIBLE_VAR_cnpg_pg_password, ANSIBLE_VAR_redis_password, etc.
+# Or use: ansible-playbook ... --extra-vars @secrets.yml
+# ──────────────────────────────────────────────────────────────────────────────
+
+env_name: stage
+
+# ── nginx-ingress ─────────────────────────────────────────────────────────────
+nginx_ingress_lb_subnet_id: "e2l9mui0oqstjrl7ldtt"  # stage-private-ru-central1-b
+nginx_ingress_external_enabled: true
+nginx_ingress_internal_lb_ip: "10.10.2.12"
+nginx_ingress_external_lb_ip: "158.160.248.69"
+
+# ── cert-manager ──────────────────────────────────────────────────────────────
+cert_manager_letsencrypt_email: "admin@myapp.example.com"
+
+# ── CloudNativePG databases ───────────────────────────────────────────────────
+# List of additional logical databases to create inside the CNPG cluster.
+# Used by playbooks/cnpg-databases-stage.yml (role: cnpg_databases).
+# Example:
+# cnpg_databases_list:
+#   - name: myapp
+#     owner: myapp
+#     secret_name: myapp-pg-credentials
+#     password: "{{ vault_myapp_pg_password }}"
+cnpg_databases_list:
+  - name: bt6_backend
+    owner: bt6_backend
+    secret_name: bt6-backend-pg-credentials
+    password: "{{ vault_backend_pg_password }}"
+  - name: temporal
+    owner: temporal
+    secret_name: temporal-pg-credentials
+    password: "{{ vault_temporal_pg_password }}"
+  - name: temporal_visibility
+    owner: temporal
+    secret_name: temporal-pg-credentials
+    password: "{{ vault_temporal_pg_password }}"
+  - name: keycloak
+    owner: keycloak
+    secret_name: keycloak-pg-credentials
+    password: "{{ vault_keycloak_pg_password }}"
+  - name: app_backend
+    owner: app_backend
+    secret_name: app-backend-pg-credentials
+    password: "{{ vault_app_backend_pg_password }}"
+
+# ── CloudNativePG ─────────────────────────────────────────────────────────────
+# Developer access: internal LB → PostgreSQL stage (требует VPN)
+cnpg_dev_lb_enabled: true
+cnpg_dev_lb_subnet_id: "e2l9mui0oqstjrl7ldtt"  # stage-private-ru-central1-b (тот же subnet что у nginx)
+cnpg_dev_lb_ip: ""  # динамический IP от YC; задай статический если нужно
+
+cnpg_namespace: databases
+cnpg_cluster_name: stage-pg
+cnpg_instances: 1
+cnpg_pg_version: "16"
+cnpg_pg_database: app
+cnpg_pg_user: app
+cnpg_pg_password: "{{ vault_cnpg_pg_password | default(lookup('env', 'CNPG_PG_PASSWORD')) }}"
+cnpg_pvc_size: "10Gi"
+cnpg_storage_class: yc-network-ssd
+
+# ── Redis ─────────────────────────────────────────────────────────────────────
+redis_namespace: databases
+redis_release_name: stage-redis
+redis_chart_version: "20.1.7"
+redis_password: "{{ vault_redis_password | default(lookup('env', 'REDIS_PASSWORD')) }}"
+
+# ── Temporal ──────────────────────────────────────────────────────────────────
+temporal_namespace: temporal
+temporal_release_name: temporal
+temporal_chart_version: "0.73.2"
+temporal_server_replica_count: 1
+temporal_web_enabled: true
+temporal_admintools_enabled: true   # нужен для первичной инициализации схемы на CNPG
+temporal_use_embedded_postgresql: false
+temporal_external_pg_host: stage-pg-rw.databases.svc.cluster.local
+temporal_external_pg_port: "5432"
+temporal_external_pg_password: "{{ vault_temporal_pg_password }}"
+
+# ── Monitoring ───────────────────────────────────────────────────────────────
+# Verify latest chart: helm search repo prometheus-community/kube-prometheus-stack --versions | head -5
+monitoring_namespace: monitoring
+monitoring_release_name: kube-prometheus-stack
+monitoring_chart_version: "82.15.1"
+monitoring_grafana_ingress_hostname: "grafana.stage.myapp.example.com"
+monitoring_grafana_viewer_password: "{{ vault_grafana_viewer_password | default(lookup('env', 'GRAFANA_VIEWER_PASSWORD')) }}"
+monitoring_prometheus_retention: "7d"
+monitoring_prometheus_storage_size: "5Gi"
+monitoring_prometheus_memory_limit: "512Mi"
+
+# ── Loki ─────────────────────────────────────────────────────────────────────
+# Verify latest: helm search repo grafana/loki --versions | head -5
+loki_namespace: monitoring
+loki_release_name: loki
+loki_chart_version: "6.55.0"
+loki_promtail_release_name: promtail
+loki_promtail_chart_version: "6.17.1"
+# Stage: filesystem на HDD-диске
+loki_storage_size: "15Gi"
+loki_storage_class: "yc-network-hdd"
+loki_retention_period: "168h"    # 7 дней
+
+# ── HashiCorp Vault ───────────────────────────────────────────────────────────
+hashicorp_vault_namespace: vault
+hashicorp_vault_release_name: vault
+hashicorp_vault_chart_version: "0.30.0-3-yckms"
+hashicorp_vault_replicas: 1
+hashicorp_vault_ha_enabled: false
+hashicorp_vault_ingress_hostname: hcvault.internal
+hashicorp_vault_storage_size: "10Gi"
+hashicorp_vault_storage_class: yc-network-ssd
+# Заполнить после tofu apply ENV=stage:
+#   tofu output -raw vault_kms_key_id
+hashicorp_vault_kms_key_id: "abju55o8lfuqma3j38ra"
+# vault_hashicorp_vault_kms_auth_json хранится в inventories/group_vars/k8s_apps_stage/vault.yml
+# Получить: tofu output -raw vault_sa_authorized_key | ansible-vault encrypt_string ...
+hashicorp_vault_kms_auth_json: "{{ vault_hashicorp_vault_kms_auth_json }}"
+
+# ── Keycloak ──────────────────────────────────────────────────────────────────
+keycloak_namespace: keycloak
+keycloak_release_name: keycloak
+keycloak_chart_version: "7.1.11"
+keycloak_replica_count: 1
+keycloak_ingress_hostname: otc-iam.myapp.example.com
+keycloak_ingress_class: nginx-external
+keycloak_cluster_issuer: letsencrypt-prod
+keycloak_pg_host: stage-pg-rw.databases.svc.cluster.local
+keycloak_pg_port: "5432"
+keycloak_pg_user: keycloak
+keycloak_pg_database: keycloak
+keycloak_admin_password: "{{ vault_keycloak_admin_password }}"
+keycloak_pg_password: "{{ vault_keycloak_pg_password }}"
+
+# ── Vaultwarden ───────────────────────────────────────────────────────────────
+vaultwarden_namespace: vaultwarden
+vaultwarden_release_name: vaultwarden
+vaultwarden_chart_version: "0.35.1"
+vaultwarden_domain: "https://vault.internal"
+vaultwarden_ingress_hostname: vault.internal
+vaultwarden_admin_token: "{{ vault_vaultwarden_admin_token | default(lookup('env', 'VAULTWARDEN_ADMIN_TOKEN')) }}"
+vaultwarden_storage_class: yc-network-ssd

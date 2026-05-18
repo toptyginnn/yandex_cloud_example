@@ -1,0 +1,110 @@
+appName: app
+component: backend
+
+image:
+  repository: cr.yandex/REGISTRY_ID/app-backend
+
+port: 8000
+secretName: app-backend-secrets
+
+# Secrets in Vaultwarden (item: myapp-app-backend-prod):
+#   DB_URL                   — postgresql://user:pass@host:6432/db
+#   TELEGRAM_BOT_TOKEN       — bot token from @BotFather
+#   SERVICES_SECRET          — internal service-to-service secret
+#   KEYCLOAK_CLIENT_SECRET   — Keycloak admin-cli client secret
+
+env:
+  # Runtime
+  SERVICE_NAME: app
+  SERVICE_PORT: "8000"
+  NUM_WORKERS: "1"
+  DEBUG_MODE: "False"
+  PYTHONUNBUFFERED: "1"
+
+  # Logging
+  LOGGING_FILE_LEVEL: WARNING
+  LOGGER_STDOUT: "True"
+  LOGGER_SERIALIZE: "True"
+  LOG_ROTATION: "True"
+  LOG_ENQUEUE: "False"
+
+  # DB connection pool (DB_URL comes from secrets)
+  MIN_CONNECTIONS: "5"
+  MAX_CONNECTIONS: "20"
+
+  # API
+  CORS_ALLOW_ORIGINS: '["https://app.myapp.example.com"]'
+  API_SWAGGER_URL: /docs
+  API_OPENAPI_URL: /openapi.json
+  WEB_PANEL_URL: https://app.myapp.example.com
+
+  # JWT
+  JWT_EXPIRES_IN_SECONDS: "3600000"
+
+  # Keycloak
+  KEYCLOAK_URL: "https://keycloak.myapp.example.com"
+  KEYCLOAK_REALM: "app"
+  KEYCLOAK_CLIENT_ID: "admin-cli"
+  ACCESS_TOKEN_LIFESPAN: "900"
+  KEYCLOAK_SWAGGER_CLIENT_ID: "swagger-ui"
+  KEYCLOAK_THIS_APP_CLIENT_ID: "app-backend"
+
+  # Telegram webhook (TELEGRAM_BOT_TOKEN comes from secrets)
+  WEBHOOK_BASE_URL: https://<YOUR_WEBHOOK_URL>
+  TG_LOGGER_HIGH_SECURITY_CHAT_ID: "<TELEGRAM_CHAT_ID>"
+  TG_LOGGER_MEDIUM_SECURITY_CHAT_ID: "<TELEGRAM_CHAT_ID>"
+  TG_LOGGER_LOW_SECURITY_CHAT_ID: "<TELEGRAM_CHAT_ID>"
+
+ingress:
+  enabled: true
+  className: nginx-external
+  host: otc-api.myapp.example.com
+  tls: true
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+replicaCount: 2
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+probes:
+  startup:
+    path: /health
+    failureThreshold: 30
+    periodSeconds: 10
+  liveness:
+    path: /health
+    periodSeconds: 15
+    failureThreshold: 3
+  readiness:
+    path: /health
+    periodSeconds: 10
+    failureThreshold: 3
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: app-backend-prod
+          topologyKey: kubernetes.io/hostname

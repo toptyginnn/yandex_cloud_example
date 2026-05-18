@@ -1,0 +1,31 @@
+controller:
+  replicaCount: 1
+  electionID: ingress-nginx-external
+
+  resources:
+    requests:
+      cpu: {{ nginx_ingress_requests_cpu }}
+      memory: {{ nginx_ingress_requests_memory }}
+    limits:
+      cpu: {{ nginx_ingress_limits_cpu }}
+      memory: {{ nginx_ingress_limits_memory }}
+
+  ingressClassResource:
+    name: "{{ nginx_ingress_external_class }}"
+    controllerValue: k8s.io/ingress-nginx-external
+    default: false
+
+  ingressClass: "{{ nginx_ingress_external_class }}"
+
+  service:
+    type: LoadBalancer
+    annotations:
+{% if nginx_ingress_external_lb_ip is defined and nginx_ingress_external_lb_ip %}
+      yandex.cloud/load-balancer-address: "{{ nginx_ingress_external_lb_ip }}"
+{% endif %}
+
+  admissionWebhooks:
+    enabled: true
+
+defaultBackend:
+  enabled: false

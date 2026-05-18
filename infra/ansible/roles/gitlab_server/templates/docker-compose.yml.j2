@@ -1,0 +1,77 @@
+services:
+  gitlab:
+    image: {{ gitlab_server_image | default('gitlab/gitlab-ce:latest') }}
+    container_name: gitlab
+    hostname: {{ gitlab_server_hostname }}
+    restart: unless-stopped
+    shm_size: "256m"
+
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url '{{ gitlab_external_url }}'
+
+        # Nginx внутри контейнера — только HTTP (Caddy обрабатывает HTTPS)
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+
+        # SSH порт для git clone/ssh
+        gitlab_rails['gitlab_shell_ssh_port'] = {{ gitlab_ssh_port | default(2222) }}
+
+        # Отключаем встроенный Let's Encrypt — используем Caddy
+        letsencrypt['enable'] = false
+
+        # Включаем email, если настроен SMTP
+        {% if gitlab_smtp_enabled | default(false) | bool %}
+        gitlab_rails['gitlab_email_enabled'] = true
+        gitlab_rails['smtp_enable'] = true
+        gitlab_rails['smtp_address'] = "{{ gitlab_smtp_address }}"
+        gitlab_rails['smtp_port'] = {{ gitlab_smtp_port | default(465) }}
+        gitlab_rails['smtp_user_name'] = "{{ gitlab_smtp_user }}"
+        gitlab_rails['smtp_password'] = "{{ gitlab_smtp_password }}"
+        gitlab_rails['smtp_domain'] = "{{ gitlab_smtp_domain | default(gitlab_external_url | regex_replace('^https?://', '') | regex_replace('/.*$', '')) }}"
+        gitlab_rails['smtp_authentication'] = "{{ gitlab_smtp_authentication | default('login') }}"
+
+        # TLS / STARTTLS — выбираем один режим (рекомендация: STARTTLS 587 или TLS 465)
+        gitlab_rails['smtp_tls'] = {{ gitlab_smtp_tls | default(false) | lower }}
+        gitlab_rails['smtp_enable_starttls_auto'] = {{ gitlab_smtp_starttls | default(true) | lower }}
+        gitlab_rails['smtp_openssl_verify_mode'] = 'peer'   # 'peer' — стандарт, 'none' — если проблемы с сертификатом
+
+        gitlab_rails['gitlab_email_from'] = '{{ gitlab_email_from }}'
+        gitlab_rails['gitlab_email_reply_to'] = '{{ gitlab_email_reply_to | default(gitlab_email_from) }}'
+        {% endif %}
+
+        # S3 backups (если включено)
+        {% if gitlab_backup_s3_enabled | default(false) | bool %}
+        gitlab_rails['backup_upload_connection'] = {
+          'provider'          => 'AWS',
+          'region'            => '{{ gitlab_backup_s3_region }}',
+          'endpoint'          => '{{ gitlab_backup_s3_endpoint }}',
+          'path_style'        => true,
+          'aws_access_key_id' => '{{ gitlab_backup_s3_access_key }}',
+          'aws_secret_access_key' => '{{ gitlab_backup_s3_secret_key }}'
+        }
+        gitlab_rails['backup_upload_remote_directory'] = '{{ gitlab_backup_s3_bucket }}'
+        {% endif %}
+
+    ports:
+      - "{{ gitlab_ssh_port | default(2222) }}:22"
+
+    volumes:
+      - ./config:/etc/gitlab
+      - ./logs:/var/log/gitlab
+      - ./data:/var/opt/gitlab
+
+  caddy:
+    image: {{ gitlab_caddy_image | default('caddy:2') }}
+    container_name: gitlab-caddy
+    restart: unless-stopped
+    depends_on:
+      - gitlab
+    ports:
+      - "{{ gitlab_http_port | default(80) }}:80"
+      - "{{ gitlab_https_port | default(443) }}:443"
+      - "{{ gitlab_https_port | default(443) }}:443/udp"  # HTTP/3 (QUIC)
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/data:/data
+      - ./caddy/config:/config
