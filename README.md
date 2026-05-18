@@ -96,7 +96,7 @@ See [infra/DEPLOYMENT_ORDER.md](infra/DEPLOYMENT_ORDER.md) for the full step-by-
 ```bash
 cd app/backend
 cp .env.sample .env
-docker compose up
+uv run uvicorn src.main:app --reload
 ```
 
 ```bash

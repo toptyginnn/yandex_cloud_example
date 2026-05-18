@@ -1,6 +1,5 @@
 run:
-	docker compose --env-file .env.runtime up --build -d --remove-orphans
+	uv run uvicorn src.main:app --reload
 
-
-stop:
-	docker compose down --remove-orphans
+lint:
+	ruff check . && ruff format --check .
