@@ -4,7 +4,7 @@
 
 Before running OpenTofu and Ansible, ensure:
 
-1. **S3 backend bucket** (`tfstate-bt6-infra`) exists in Yandex Object Storage
+1. **S3 backend bucket** (`tfstate-myapp-infra`) exists in Yandex Object Storage
 2. **Yandex Cloud CLI** (`yc`) is installed and authenticated
 3. **OpenTofu** >= 1.6, **Ansible** with `kubernetes.core` collection, **Helm** CLI are installed
    ```bash
@@ -247,7 +247,7 @@ ansible-playbook playbooks/cnpg-databases-prod.yml
 ```
 
 **Creates logical databases in `prod-pg`:**
-- `bt6_backend` / owner `bt6_backend`
+- `app_backend` / owner `app_backend`
 - `temporal` / owner `temporal`
 - `temporal_visibility` / owner `temporal`
 - `keycloak` / owner `keycloak`

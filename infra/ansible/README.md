@@ -1,6 +1,6 @@
 # Ansible Infrastructure Management
 
-Этот каталог содержит Ansible playbooks и роли для автоматизации развертывания инфраструктуры проекта bt6.
+Этот каталог содержит Ansible playbooks и роли для автоматизации развертывания инфраструктуры проекта.
 
 ## 📋 Содержание
 
@@ -263,4 +263,4 @@ ansible-playbook -i inventories/hosts.yml playbooks/k8s-apps-stage.yml --limit s
 
 ## 📝 License
 
-Проект bt6 - внутренний проект компании.
+Проект 

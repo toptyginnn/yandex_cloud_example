@@ -108,7 +108,7 @@ make clean-all
 4. Fetch kubeconfig: `make kubeconfig ENV=prod`
 5. `make k8s-apps-prod` (деплоит nginx-ingress, cert-manager, CNPG, Redis, Temporal, Vaultwarden, Keycloak, Monitoring, Loki)
 6. После деплоя nginx-ingress: заполни `nginx_ingress_internal_lb_ip` и перезапусти `tofu apply ENV=prod` для DNS-записей
-7. `ansible-playbook playbooks/cnpg-databases-prod.yml` (создаёт БД: bt6_backend, temporal, keycloak, app_backend)
+7. `ansible-playbook playbooks/cnpg-databases-prod.yml` (создаёт БД: app_backend, temporal, keycloak, app_backend)
 8. `ansible-playbook playbooks/hashicorp-vault-prod.yml`
 9. If using CDN, configure CNAME to CDN endpoint.
 
