@@ -46,7 +46,7 @@ Portfolio-grade example of a production infrastructure on Yandex Cloud. Based on
 
 | Environment | Purpose                              | VMs         |
 |-------------|--------------------------------------|-------------|
-| **INFRA**   | WireGuard VPN + GitLab + Runners     | on-demand   |
+| **INFRA**   | NetBird VPN + GitLab + Runners       | on-demand   |
 | **STAGE**   | Full copy of prod, cheaper           | preemptible |
 | **PROD**    | Production, HA, auto-scaling 2–5 nodes | on-demand |
 
