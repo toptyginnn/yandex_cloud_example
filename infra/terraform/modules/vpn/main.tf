@@ -7,7 +7,7 @@ terraform {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# VPN Module – WireGuard on Yandex Compute Instance
+# VPN Module – NetBird on Yandex Compute Instance
 # ──────────────────────────────────────────────────────────────────────────────
 
 # ── Static external IP ───────────────────────────────────────────────────────
@@ -20,7 +20,7 @@ resource "yandex_vpc_address" "vpn" {
   }
 }
 
-# ── WireGuard Server Instance ────────────────────────────────────────────────
+# ── NetBird Server Instance ────────────────────────────────────────────────
 resource "yandex_compute_instance" "vpn" {
   name        = "${var.env_name}-vpn"
   hostname    = "${var.env_name}-vpn"

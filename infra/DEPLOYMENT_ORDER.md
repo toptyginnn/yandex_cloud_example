@@ -98,7 +98,7 @@ make plan  ENV=infra
 make apply ENV=infra
 ```
 
-**Creates:** `infra-vpc`, WireGuard VPN server, GitLab CE server
+**Creates:** `infra-vpc`, NetBird VPN server, GitLab CE server
 
 **Post-apply:**
 1. Note outputs: `make output ENV=infra`

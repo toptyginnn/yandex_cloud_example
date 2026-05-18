@@ -9,7 +9,7 @@ docker_packages:
 # VPN
 vpn_public_host: gw.myapp.example.com
 vpn_ui_domain: gw.myapp.example.com
-vpn_wireguard_port: 51820
+netbird_port: 51820
 vpn_admin_username: admin
 vpn_admin_password: change-me
 vpn_client_dns:
@@ -19,7 +19,7 @@ vpn_client_allowed_ips:
   - 10.10.0.0/16
   - 10.20.0.0/16
   - 10.30.0.0/16
-vpn_wg_easy_image: ghcr.io/wg-easy/wg-easy:15
+vpn_wg_easy_image: ghcr.io/NetBird/NetBird:15
 vpn_caddy_image: caddy:2
 vpn_caddy_email: ""
 

@@ -76,7 +76,7 @@ ansible/
 │       └── vault_prod-runner.yml     # Секреты prod runner
 │
 ├── playbooks/                   # Ansible playbooks
-│   ├── vpn.yml                  # Развертывание VPN (WireGuard)
+│   ├── vpn.yml                  # Развертывание VPN (NetBird)
 │   ├── gitlab-server.yml        # Развертывание GitLab Server
 │   ├── gitlab-runner-stage.yml  # Stage GitLab Runner
 │   ├── gitlab-runner-prod.yml   # Production GitLab Runner
@@ -85,7 +85,7 @@ ansible/
 │
 └── roles/                       # Ansible роли
     ├── docker_host/             # Установка Docker
-    ├── vpn/                     # WireGuard VPN
+    ├── vpn/                     # NetBird VPN
     ├── gitlab_server/           # GitLab CE Server
     ├── gitlab_runner/           # GitLab Runner
     ├── cloudnative_pg/          # CloudNativePG (PostgreSQL operator)
@@ -120,11 +120,11 @@ ansible-vault encrypt inventories/group_vars/vault_*.yml
 
 ### Инфраструктурные сервисы
 
-#### VPN (WireGuard)
+#### VPN (NetBird)
 ```bash
 ansible-playbook -i inventories/hosts.yml playbooks/vpn.yml
 ```
-Устанавливает WireGuard VPN с веб-интерфейсом wg-easy и Caddy в качестве reverse proxy.
+Устанавливает NetBird VPN с веб-интерфейсом NetBird и Caddy в качестве reverse proxy.
 
 #### GitLab Server
 ```bash
@@ -168,12 +168,12 @@ ansible-playbook -i inventories/hosts.yml playbooks/k8s-apps-prod.yml
 **Используется в**: VPN, GitLab Server, GitLab Runners
 
 ### vpn
-Разворачивает WireGuard VPN с веб-интерфейсом [wg-easy](https://github.com/wg-easy/wg-easy) и Caddy.
+Разворачивает NetBird VPN с веб-интерфейсом [NetBird](https://netbird.io) и Caddy.
 
 **Переменные**:
 - `vpn_public_host` - публичный домен VPN
 - `vpn_admin_password` - пароль администратора UI
-- `vpn_wireguard_port` - порт WireGuard (по умолчанию 51820)
+- `netbird_port` - порт NetBird (по умолчанию 51820)
 
 ### gitlab_server
 Разворачивает GitLab Community Edition с Caddy для автоматического HTTPS.

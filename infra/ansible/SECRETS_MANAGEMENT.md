@@ -146,7 +146,7 @@ ansible-playbook -i inventories/hosts.yml playbooks/k8s-apps-stage.yml \
 
 | Переменная | Описание |
 |------------|----------|
-| `vault_vpn_admin_password` | Пароль администратора WireGuard UI |
+| `vault_vpn_admin_password` | Пароль администратора NetBird UI |
 | `vault_gitlab_smtp_password` | Пароль SMTP для GitLab |
 | `vault_gitlab_backup_s3_access_key` | Access key для S3 бэкапов GitLab |
 | `vault_gitlab_backup_s3_secret_key` | Secret key для S3 бэкапов GitLab |

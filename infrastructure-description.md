@@ -34,7 +34,7 @@ graph LR
 ```mermaid
 graph TD
     Internet[Интернет]
-    VPN[WireGuard VPN единственная точка входа для команды]
+    VPN[NetBird VPN единственная точка входа для команды]
     Internal[Внутренняя сеть VPC K8s БД Сервисы GitLab]
     Users[Пользователи приложения]
     Frontend[Фронтенд и API публичные адреса]
@@ -257,7 +257,7 @@ graph TB
 
     subgraph YC[Yandex Cloud]
         subgraph INFRA[INFRA]
-            VPN[WireGuard VPN]
+            VPN[NetBird VPN]
             GitLab[GitLab + Runner]
         end
 

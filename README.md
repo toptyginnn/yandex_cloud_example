@@ -29,7 +29,7 @@ Portfolio-grade example of a production infrastructure on Yandex Cloud. Based on
 └── infra/
     ├── terraform/
     │   ├── environments/
-    │   │   ├── infra/  # VPN (WireGuard) + GitLab
+    │   │   ├── infra/  # VPN (NetBird) + GitLab
     │   │   ├── stage/  # Kubernetes cluster, preemptible VMs
     │   │   └── prod/   # Kubernetes cluster, on-demand, multi-AZ
     │   └── modules/    # Reusable modules: k8s, postgresql, redis, temporal, ...
@@ -50,9 +50,57 @@ Portfolio-grade example of a production infrastructure on Yandex Cloud. Based on
 | **STAGE**   | Full copy of prod, cheaper           | preemptible |
 | **PROD**    | Production, HA, auto-scaling 2–5 nodes | on-demand |
 
+## Architecture
+
+```mermaid
+flowchart TB
+    Team["Team"]
+    Users["Users"]
+
+    subgraph YC["Yandex Cloud"]
+        subgraph INFRA["INFRA"]
+            VPN["NetBird VPN"]
+            GL["GitLab CI/CD"]
+        end
+
+        subgraph STAGE["STAGE — preemptible VMs"]
+            SK8s["Kubernetes"]
+            subgraph SVC_S["Services"]
+                SB["Backend"]
+                SPG["PostgreSQL"]
+                SR["Redis"]
+                ST["Temporal"]
+            end
+            SS3["Object Storage — Frontend"]
+        end
+
+        subgraph PROD["PROD — on-demand · multi-AZ · autoscaling 2–5 nodes"]
+            PK8s["Kubernetes"]
+            subgraph SVC_P["Services"]
+                PB["Backend"]
+                PPG["PostgreSQL HA"]
+                PR["Redis"]
+                PT["Temporal ×3"]
+                PK["Keycloak"]
+                PV["Vault ×3"]
+            end
+            PS3["Object Storage + CDN — Frontend"]
+        end
+    end
+
+    Team -- "NetBird tunnel" --> VPN
+    VPN --> GL
+    GL -- "auto deploy" --> SK8s
+    GL -- "manual gate" --> PK8s
+    Users --> SS3
+    Users --> SK8s
+    Users --> PS3
+    Users --> PK8s
+```
+
 ## Key design decisions
 
-- **No public access to databases or internal services** — all access goes through WireGuard VPN
+- **No public access to databases or internal services** — all access goes through NetBird VPN
 - **Secrets in HashiCorp Vault** — nothing in env files or code; secrets synced to K8s via Vaultwarden + bw CLI at deploy time
 - **Infrastructure as Code** — every change is a git commit; full environment can be reproduced from scratch
 - **GitLab CI with manual prod gate** — stage deploys automatically, prod requires manual approval

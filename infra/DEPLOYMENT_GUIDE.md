@@ -10,7 +10,7 @@ and configure software on the VMs with Ansible from `ansible/`.
 3. **Credentials:** Export env vars (recommended)
    ```bash
    export TF_VAR_yc_token="<oauth-or-iam-token>"
-   export TF_VAR_wg_easy_init_password="<wg-easy-admin-password>"
+   export TF_VAR_wg_easy_init_password="<NetBird-admin-password>"
    ```
    DB passwords are managed via Ansible Vault (not Terraform) for all environments.
 4. **SSH key:** Provide `ssh_public_keys` in `terraform/environments/*/terraform.tfvars`
@@ -20,7 +20,7 @@ and configure software on the VMs with Ansible from `ansible/`.
 
 Apply in this order:
 1) OpenTofu from `terraform/` creates VM/network/storage infrastructure
-2) Ansible from `ansible/` configures VPN (`wg-easy` + `caddy`)
+2) Ansible from `ansible/` configures VPN (`NetBird` + `caddy`)
 3) Ansible from `ansible/` configures GitLab server and GitLab runners
 
 Teardown is the reverse: prod → stage → infra.
@@ -52,7 +52,7 @@ make clean-all
 
 ### What it creates
 - `infra-vpc` with public+private subnets, NAT GW, security groups
-- WireGuard VPN server (static IP)
+- NetBird VPN server (static IP)
 - GitLab CE server (static public IP; 80/443/22 open) on public subnet
 
 ### Steps
@@ -60,7 +60,7 @@ make clean-all
 2. Note outputs:
    - `gitlab_public_ip` – add DNS A record (optional)
    - `gitlab_external_url` – ensure it matches DNS or `http://<public_ip>`
-   - `vpn_public_ip` – use to configure WireGuard clients
+   - `vpn_public_ip` – use to configure NetBird clients
 3. Run `ansible-playbook playbooks/vpn.yml` from `ansible/`
 4. Run `ansible-playbook playbooks/gitlab-server.yml` from `ansible/`
 5. Create `gitlab_runner_token` in GitLab UI and place it into `ansible/group_vars/all.yml`

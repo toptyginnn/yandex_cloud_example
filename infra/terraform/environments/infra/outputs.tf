@@ -8,7 +8,7 @@ output "vpc_network_id" {
 }
 
 output "vpn_public_ip" {
-  description = "WireGuard VPN public IP"
+  description = "NetBird VPN public IP"
   value       = module.vpn.vpn_public_ip
 }
 
