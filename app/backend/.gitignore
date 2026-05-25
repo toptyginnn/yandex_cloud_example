@@ -104,6 +104,4 @@ poetry.lock
 docker-compose-local.yml
 
 *.code-workspace
-.hive-mind/*
-hive-mind*.txt
 

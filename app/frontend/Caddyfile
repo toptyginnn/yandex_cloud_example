@@ -1,26 +1,26 @@
 # global options
 {
-    admin off # there's no need for the admin api in railway's environment
-    persist_config off # storage isn't persistent anyway
-    auto_https off # railway handles https for us, this would cause issues if left enabled
+    admin off
+    persist_config off
+    auto_https off # TLS is handled by the ingress controller
     # runtime logs
     log {
         format json # set runtime log format to json mode
     }
     # server options
     servers {
-        trusted_proxies static private_ranges 100.0.0.0/8 # trust railway's proxy
+        trusted_proxies static private_ranges 100.0.0.0/8
     }
 }
 
-# site block, listens on the $PORT environment variable, automatically assigned by railway
+# site block, listens on the $PORT environment variable
 :{$PORT} {
     # access logs
     log {
         format json # set access log format to json mode
     }
 
-    # health check for railway
+    # health check
     rewrite /health /*
 
     # serve from the 'build' folder (Vite builds into the 'build' folder)

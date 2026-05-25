@@ -1,8 +1,7 @@
 # ──────────────────────────────────────────────────────────────────────────────
-# otc/frontend — GitLab CI
+# app/frontend — GitLab CI
 #
 # Only main branch is deployed — to the prod cluster (manual trigger).
-# Dev/stage environments are managed manually via Railway.
 #
 # Build config is baked via .env.production (committed to repo).
 # No GitLab CI variables needed for Vite build — template doesn't pass them as build-args.
@@ -24,7 +23,7 @@ include:
     ref: main
     file: '/gitlab-ci/templates/frontend.yml'
 
-# ── Disable jobs not applicable to OTC ───────────────────────────────────────
+# ── Disable unused jobs ──────────────────────────────────────────────────────
 deploy-dev:
   rules:
     - when: never

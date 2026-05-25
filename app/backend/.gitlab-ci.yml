@@ -1,8 +1,7 @@
 # ──────────────────────────────────────────────────────────────────────────────
-# otc/backend — GitLab CI
+# app/backend — GitLab CI
 #
 # Only main branch is deployed — to the prod cluster (manual trigger).
-# Dev/stage environments are managed manually via Railway.
 #
 # Project-level variables (Settings → CI/CD → Variables):
 #   (none required beyond group-level)
@@ -24,7 +23,7 @@ include:
     ref: main
     file: '/gitlab-ci/templates/backend.yml'
 
-# ── Disable jobs not applicable to OTC ───────────────────────────────────────
+# ── Disable unused jobs ──────────────────────────────────────────────────────
 deploy-dev:
   rules:
     - when: never
